@@ -138,7 +138,6 @@
           <th>全体タイムライン（秒）</th>
           <th>ファイル</th>
           <th>ファイル内（秒）</th>
-          <th>seed / 設定</th>
         </tr>
       </thead>
       <tbody id="logBody"></tbody>
@@ -213,6 +212,7 @@
   let playPlan = [];
   let rngSeed = autoSeed();
   let rng = mulberry32(rngSeed);
+  let logEntries = [];
 
   // Playback state for boundary-crossing segments
   let planIndex = -1;
@@ -265,6 +265,7 @@
     tracks = [];
     segments = [];
     playPlan = [];
+    logEntries = [];
     totalDuration = 0;
     lastBuildFallbackLayers = [];
     planIndex = -1;
@@ -449,6 +450,7 @@
 
     // reset log view
     $("logBody").innerHTML = "";
+    logEntries = [];
     $("exportLogBtn").disabled = true;
 
     planIndex = -1;
@@ -575,8 +577,7 @@
       String(item.segIndex + 1),
       `${fmtTime(g0)} → ${fmtTime(g1)} (${(g1-g0).toFixed(3)}s)`,
       `${trAtStart.rel}`,
-      `${fmtTime(local0)} → ${fmtTime(local1)}${partSuffix}`,
-      `seed=${rngSeed} / N=${$("layers").value}, L=${$("segLen").value}s`
+      `${fmtTime(local0)} → ${fmtTime(local1)}${partSuffix}`
     ];
 
     for (const c of cells) {
@@ -585,6 +586,15 @@
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
+    logEntries.push({
+      index: logEntries.length + 1,
+      layer: item.segIndex + 1,
+      global: `${fmtTime(g0)} → ${fmtTime(g1)} (${(g1-g0).toFixed(3)}s)`,
+      file: trAtStart.rel,
+      local: `${fmtTime(local0)} → ${fmtTime(local1)}${partSuffix}`,
+      partIndex: item.partIndex,
+      partCount: item.partCount
+    });
 
     $("exportLogBtn").disabled = false;
   }
@@ -798,19 +808,8 @@
   });
 
   $("exportLogBtn").addEventListener("click", async () => {
-    // Export current log table as JSON (planned mapping per segment)
-    const log = [];
-    const rows = $("logBody").querySelectorAll("tr");
-    rows.forEach((tr, i) => {
-      const tds = tr.querySelectorAll("td");
-      log.push({
-        index: i + 1,
-        global: tds[1]?.textContent ?? "",
-        file: tds[2]?.textContent ?? "",
-        local: tds[3]?.textContent ?? "",
-        meta: tds[4]?.textContent ?? ""
-      });
-    });
+    // Export current log entries as JSON
+    const log = logEntries.slice();
 
     const payload = {
       generatedAt: new Date().toISOString(),
@@ -828,6 +827,7 @@
 
   $("clearLogBtn").addEventListener("click", () => {
     $("logBody").innerHTML = "";
+    logEntries = [];
     $("exportLogBtn").disabled = true;
   });
 

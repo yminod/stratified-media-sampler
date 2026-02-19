@@ -24,6 +24,13 @@
     th { background: #f2f2f2; text-align: left; }
     .small { font-size: 12px; color: #555; }
     .pill { display: inline-block; padding: 2px 6px; border: 1px solid #bbb; border-radius: 999px; font-size: 12px; }
+    .drop-zone { border: 2px dashed #888; padding: 16px; border-radius: 8px; background: #fafafa; text-align: center; }
+    .drop-zone.dragover { background: #f0f6ff; border-color: #3a6ea5; }
+    .file-list { list-style: none; padding: 0; margin: 6px 0 0; max-height: 220px; overflow: auto; }
+    .file-item { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid #ddd; margin-bottom: 6px; background: #fff; }
+    .file-item.dragging { opacity: 0.5; }
+    .drag-handle { cursor: grab; user-select: none; color: #666; }
+    .file-meta { font-size: 12px; color: #666; }
   </style>
 </head>
 <body>
@@ -31,6 +38,15 @@
 
   <fieldset>
     <legend>1) 入力</legend>
+    <div class="row">
+      <div class="col" style="flex:1;">
+        <div id="dropZone" class="drop-zone">
+          ここにファイルをドラッグ＆ドロップ
+          <div class="small">フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。</div>
+        </div>
+        <div id="dropMsg" class="small" style="margin-top:6px;"></div>
+      </div>
+    </div>
     <div class="row">
       <div class="col">
         <label>複数ファイル選択</label>
@@ -49,7 +65,11 @@
 
     <div class="status" style="margin-top:10px;">
       <div><strong>読み込み状態:</strong> <span id="loadState">未選択</span></div>
-      <div class="small mono" id="fileList"></div>
+      <div class="row" style="margin-top:6px; align-items: center;">
+        <div class="small" id="orderState">並び: 既定</div>
+        <button id="sortResetBtn" disabled>整列</button>
+      </div>
+      <ul class="file-list" id="fileList"></ul>
     </div>
   </fieldset>
 
@@ -195,11 +215,27 @@
     return (v >>> 0);
   }
 
+  function hasMediaExtension(name) {
+    const m = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+    if (!m) return false;
+    const ext = m[1];
+    const audio = new Set(["mp3", "wav", "flac", "m4a", "aac", "ogg", "opus", "alac", "aiff", "aif", "wma"]);
+    const video = new Set(["mp4", "m4v", "mkv", "webm", "mov", "avi", "wmv", "mpg", "mpeg"]);
+    return audio.has(ext) || video.has(ext);
+  }
+
+  function isMediaFile(file) {
+    if (file.type.startsWith("audio/") || file.type.startsWith("video/")) return true;
+    if (!file.type || file.type === "application/octet-stream") return hasMediaExtension(file.name);
+    return false;
+  }
+
   // ---------- State ----------
   /** @type {{file: File, name: string, rel: string, duration: number, startGlobal: number, endGlobal: number}[]} */
   let tracks = [];
   let totalDuration = 0;
   let lastBuildFallbackLayers = [];
+  let fileOrderMode = "default";
 
   /** segments: each is {layerIndex, globalStart, globalEnd} */
   let segments = [];
@@ -250,46 +286,107 @@
     });
   }
 
-  function sortFiles(files) {
+  function normalizeFiles(files) {
     // prefer relativePath if present (directory input)
-    const arr = Array.from(files).map(f => {
+    return Array.from(files).map((f, idx) => {
       const rel = f.webkitRelativePath || "";
       const key = rel ? rel : f.name;
-      return { file: f, key, rel };
+      return { file: f, key, rel, idx };
     });
-    arr.sort((a, b) => a.key.localeCompare(b.key, "en"));
+  }
+
+  function sortFileEntries(entries) {
+    const arr = entries.slice();
+    arr.sort((a, b) => {
+      const k = a.key.localeCompare(b.key, "en");
+      if (k !== 0) return k;
+      return a.idx - b.idx;
+    });
     return arr;
   }
 
-  async function loadFiles(files) {
+  function updateOrderState() {
+    $("orderState").textContent = fileOrderMode === "custom" ? "並び: カスタム" : "並び: 既定";
+    $("sortResetBtn").disabled = fileOrderMode !== "custom";
+  }
+
+  function renderFileList() {
+    const ul = $("fileList");
+    ul.innerHTML = "";
+    for (let i = 0; i < tracks.length; i++) {
+      const tr = tracks[i];
+      const li = document.createElement("li");
+      li.className = "file-item";
+      li.draggable = true;
+      li.dataset.index = String(i);
+
+      const handle = document.createElement("span");
+      handle.className = "drag-handle";
+      handle.textContent = "[drag]";
+
+      const label = document.createElement("span");
+      label.textContent = tr.rel;
+
+      const meta = document.createElement("span");
+      meta.className = "file-meta";
+      meta.textContent = isFinite(tr.duration) ? `(${tr.duration.toFixed(3)}s)` : "";
+
+      li.appendChild(handle);
+      li.appendChild(label);
+      li.appendChild(meta);
+      ul.appendChild(li);
+    }
+  }
+
+  function recomputeGlobalTimeline() {
+    let cursor = 0;
+    for (let i = 0; i < tracks.length; i++) {
+      const tr = tracks[i];
+      tr.startGlobal = cursor;
+      tr.endGlobal = cursor + tr.duration;
+      cursor = tr.endGlobal;
+    }
+    totalDuration = cursor;
+  }
+
+  function resetSegmentsAndLog() {
+    segments = [];
+    playPlan = [];
+    logEntries = [];
+    $("logBody").innerHTML = "";
+    $("exportLogBtn").disabled = true;
+    planIndex = -1;
+    stopPlaybackUIOnly();
+    updateButtons();
+  }
+
+  async function loadFilesFromEntries(entries, { orderMode = "default" } = {}) {
     tracks = [];
     segments = [];
     playPlan = [];
     logEntries = [];
     totalDuration = 0;
     lastBuildFallbackLayers = [];
+    fileOrderMode = orderMode;
     planIndex = -1;
     stopPlaybackUIOnly();
 
-    if (!files || files.length === 0) {
+    if (!entries || entries.length === 0) {
       $("loadState").textContent = "未選択";
-      $("fileList").textContent = "";
+      renderFileList();
       updateStats();
       updateButtons();
+      updateOrderState();
       return;
     }
 
-    $("loadState").textContent = `duration取得中... (${files.length} files)`;
-    $("fileList").textContent = "";
+    $("loadState").textContent = `duration取得中... (${entries.length} files)`;
 
-    const sorted = sortFiles(files);
-    const listLines = [];
     let cursor = 0;
 
-    for (let i = 0; i < sorted.length; i++) {
-      const { file, key, rel } = sorted[i];
-      // Basic filtering: audio/* or video/*
-      if (!(file.type.startsWith("audio/") || file.type.startsWith("video/"))) continue;
+    for (let i = 0; i < entries.length; i++) {
+      const { file, key, rel } = entries[i];
+      if (!isMediaFile(file)) continue;
 
       try {
         const d = await getDurationForFile(file);
@@ -300,25 +397,186 @@
           file,
           name: file.name,
           rel: rel || file.name,
+          orderKey: key,
           duration: d,
           startGlobal,
           endGlobal
         });
 
         cursor = endGlobal;
-        listLines.push(`${String(tracks.length).padStart(3," ")}  ${rel || file.name}  (${d.toFixed(3)}s)`);
       } catch (e) {
-        listLines.push(`ERR  ${key}  (${e.message})`);
+        // skip broken file but keep going
       }
     }
 
     totalDuration = cursor;
 
     $("loadState").textContent = `読み込み完了: ${tracks.length} files, total ${totalDuration.toFixed(3)}s`;
-    $("fileList").textContent = listLines.slice(0, 60).join("\n") + (listLines.length > 60 ? `\n... (${listLines.length-60} more)` : "");
-
+    if (tracks.length === 0) {
+      setDropMsg("メディアファイルが見つかりませんでした。");
+    }
+    renderFileList();
     updateStats();
     updateButtons();
+    updateOrderState();
+  }
+
+  function setDropMsg(msg) {
+    $("dropMsg").textContent = msg || "";
+  }
+
+  function toIndexedEntries(entries) {
+    return entries.map((e, idx) => ({ ...e, idx }));
+  }
+
+  function fileFromFileEntry(entry) {
+    return new Promise((resolve, reject) => {
+      entry.file((file) => resolve(file), reject);
+    });
+  }
+
+  function readAllEntries(reader) {
+    return new Promise((resolve, reject) => {
+      const entries = [];
+      const read = () => {
+        reader.readEntries((batch) => {
+          if (!batch.length) resolve(entries);
+          else {
+            entries.push(...batch);
+            read();
+          }
+        }, reject);
+      };
+      read();
+    });
+  }
+
+  async function collectFilesFromEntry(entry) {
+    if (entry.isFile) {
+      const file = await fileFromFileEntry(entry);
+      const rel = entry.fullPath ? entry.fullPath.replace(/^\/+/, "") : file.name;
+      return [{ file, rel, key: rel || file.name }];
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const children = await readAllEntries(reader);
+      const nested = [];
+      for (const child of children) {
+        const files = await collectFilesFromEntry(child);
+        nested.push(...files);
+      }
+      return nested;
+    }
+    return [];
+  }
+
+  async function collectFilesFromHandle(handle, prefix = "") {
+    if (!handle) return [];
+    if (handle.kind === "file") {
+      const file = await handle.getFile();
+      const rel = `${prefix}${handle.name}`;
+      return [{ file, rel, key: rel }];
+    }
+    if (handle.kind === "directory") {
+      const out = [];
+      const nextPrefix = `${prefix}${handle.name}/`;
+      if (handle.entries) {
+        for await (const [, child] of handle.entries()) {
+          const nested = await collectFilesFromHandle(child, nextPrefix);
+          out.push(...nested);
+        }
+      } else if (handle.values) {
+        for await (const child of handle.values()) {
+          const nested = await collectFilesFromHandle(child, nextPrefix);
+          out.push(...nested);
+        }
+      }
+      return out;
+    }
+    return [];
+  }
+
+  async function collectEntriesFromDataTransfer(items) {
+    const all = [];
+    const len = items.length || 0;
+    for (let i = 0; i < len; i++) {
+      const item = items[i];
+      if (item.kind && item.kind !== "file") continue;
+
+      // File System Access API (Chrome/Edge)
+      if (item.getAsFileSystemHandle) {
+        try {
+          const handle = await item.getAsFileSystemHandle();
+          const files = await collectFilesFromHandle(handle, "");
+          all.push(...files);
+          continue;
+        } catch (e) {
+          // ignore and fallback
+        }
+      }
+
+      // webkit entry API
+      let entry = null;
+      try {
+        entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+      } catch (e) {
+        entry = null;
+      }
+      if (entry) {
+        try {
+          const files = await collectFilesFromEntry(entry);
+          all.push(...files);
+        } catch (e) {
+          // ignore and fallback to next
+        }
+        continue;
+      }
+
+      const f = item.getAsFile ? item.getAsFile() : null;
+      if (f) {
+        all.push({ file: f, rel: f.name, key: f.name });
+      }
+    }
+    return all;
+  }
+
+  function hasDirectoryItems(items) {
+    const len = items.length || 0;
+    for (let i = 0; i < len; i++) {
+      const item = items[i];
+      if (!item || (item.kind && item.kind !== "file")) continue;
+      try {
+        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+        if (entry && entry.isDirectory) return true;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return false;
+  }
+
+  function reorderTracks(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    const item = tracks.splice(fromIndex, 1)[0];
+    tracks.splice(toIndex, 0, item);
+    recomputeGlobalTimeline();
+    resetSegmentsAndLog();
+    fileOrderMode = "custom";
+    renderFileList();
+    updateStats();
+    updateButtons();
+    updateOrderState();
+  }
+
+  function sortTracksByDefault() {
+    tracks.sort((a, b) => a.orderKey.localeCompare(b.orderKey, "en"));
+    recomputeGlobalTimeline();
+    resetSegmentsAndLog();
+    fileOrderMode = "default";
+    renderFileList();
+    updateStats();
+    updateButtons();
+    updateOrderState();
   }
 
   // ---------- Stratified segment generation ----------
@@ -728,19 +986,126 @@
   $("fileInput").addEventListener("change", async (e) => {
     const files = e.target.files;
     $("dirInput").value = "";
-    await loadFiles(files);
+    setDropMsg("");
+    const entries = sortFileEntries(normalizeFiles(files));
+    await loadFilesFromEntries(entries, { orderMode: "default" });
   });
 
   $("dirInput").addEventListener("change", async (e) => {
     const files = e.target.files;
     $("fileInput").value = "";
-    await loadFiles(files);
+    setDropMsg("");
+    const entries = sortFileEntries(normalizeFiles(files));
+    await loadFilesFromEntries(entries, { orderMode: "default" });
   });
 
   $("clearBtn").addEventListener("click", async () => {
     $("fileInput").value = "";
     $("dirInput").value = "";
-    await loadFiles([]);
+    setDropMsg("");
+    await loadFilesFromEntries([]);
+  });
+
+  $("sortResetBtn").addEventListener("click", () => {
+    if (tracks.length === 0) return;
+    sortTracksByDefault();
+  });
+
+  // Drag & drop input
+  const dropZone = $("dropZone");
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
+  });
+  dropZone.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    setDropMsg("");
+
+    const dt = e.dataTransfer;
+    if (!dt) return;
+
+    const files = dt.files;
+    const items = dt.items;
+    const hasItems = items && items.length > 0;
+    const hasFiles = files && files.length > 0;
+
+    if (hasFiles) {
+      let anyMedia = false;
+      for (const f of files) {
+        if (isMediaFile(f)) { anyMedia = true; break; }
+      }
+      if (anyMedia || !hasItems) {
+        const entries = sortFileEntries(normalizeFiles(files));
+        $("fileInput").value = "";
+        $("dirInput").value = "";
+        await loadFilesFromEntries(entries, { orderMode: "default" });
+        return;
+      }
+      // If files exist but none look like media, try items first (likely folder drop)
+    }
+
+    if (hasItems) {
+      try {
+        const collected = await collectEntriesFromDataTransfer(items);
+        if (collected.length > 0) {
+          const entries = sortFileEntries(toIndexedEntries(collected));
+          $("fileInput").value = "";
+          $("dirInput").value = "";
+          await loadFilesFromEntries(entries, { orderMode: "default" });
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (hasFiles) {
+      const entries = sortFileEntries(normalizeFiles(files));
+      $("fileInput").value = "";
+      $("dirInput").value = "";
+      await loadFilesFromEntries(entries, { orderMode: "default" });
+      return;
+    }
+
+    setDropMsg("ファイルをドラッグアンドドロップしてください。");
+  });
+
+  // Reorder list (drag & drop)
+  const fileList = $("fileList");
+  let dragIndex = -1;
+  fileList.addEventListener("dragstart", (e) => {
+    if (isPlaying) {
+      e.preventDefault();
+      return;
+    }
+    const li = e.target.closest(".file-item");
+    if (!li) return;
+    dragIndex = Number(li.dataset.index);
+    li.classList.add("dragging");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  fileList.addEventListener("dragend", (e) => {
+    const li = e.target.closest(".file-item");
+    if (li) li.classList.remove("dragging");
+    dragIndex = -1;
+  });
+  fileList.addEventListener("dragover", (e) => {
+    if (dragIndex < 0) return;
+    e.preventDefault();
+  });
+  fileList.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const li = e.target.closest(".file-item");
+    if (!li) return;
+    const toIndex = Number(li.dataset.index);
+    if (dragIndex >= 0 && toIndex >= 0 && dragIndex !== toIndex) {
+      reorderTracks(dragIndex, toIndex);
+    }
+    dragIndex = -1;
   });
 
   $("preset").addEventListener("change", () => {
@@ -837,6 +1202,7 @@
 
   updateStats();
   updateButtons();
+  updateOrderState();
 })();
 </script>
 </body>

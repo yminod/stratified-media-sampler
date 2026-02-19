@@ -59,6 +59,7 @@
     .segment-list { list-style: none; padding: 0; margin: 0; max-height: 260px; overflow: auto; }
     .segment-item { padding: 8px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
     .segment-item.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(23, 107, 107, 0.15); background: #f2fbfb; }
+    .segment-note { margin-top: 6px; opacity: 0.65; font-size: 12px; color: var(--muted); }
     .segment-title { font-weight: 600; }
     .segment-sub { font-size: 12px; color: var(--muted); }
   </style>
@@ -82,19 +83,11 @@
           <div id="dropMsg" class="small" style="margin-top:6px;"></div>
         </div>
       </div>
-      <div class="row">
+      <div class="row" style="margin-top:8px;">
         <div class="col">
           <label>複数ファイル選択</label>
           <input id="fileInput" type="file" multiple accept="audio/*,video/*" />
-          <div class="small">複数の音声/動画ファイルを選択します。</div>
-        </div>
-        <div class="col">
-          <label>ディレクトリ選択（Chrome/Edge）</label>
-          <input id="dirInput" type="file" webkitdirectory directory multiple accept="audio/*,video/*" />
-          <div class="small">ディレクトリ内の全ファイルを取得します（相対パス昇順で並べます）。</div>
-        </div>
-        <div class="col">
-          <button id="clearBtn">クリア</button>
+          <div class="small">ドラッグ&ドロップが使えない場合の代替手段です。</div>
         </div>
       </div>
 
@@ -105,6 +98,9 @@
           <button id="sortResetBtn" disabled>整列</button>
         </div>
         <ul class="file-list" id="fileList"></ul>
+      </div>
+      <div class="row" style="margin-top:8px; justify-content: flex-end;">
+        <button id="clearBtn">クリア</button>
       </div>
     </fieldset>
 
@@ -176,6 +172,7 @@
       <div>
         <h2>区間リスト</h2>
         <ul class="segment-list" id="segmentList"></ul>
+        <div class="segment-note">区間リストをShift+クリックでその区間から再生</div>
       </div>
       <div>
         <h2>再生</h2>
@@ -183,6 +180,7 @@
         <div class="row" style="margin-top:10px;">
           <button id="startBtn" disabled>再生開始</button>
           <button id="pauseBtn" disabled>一時停止/再開</button>
+          <button id="prevBtn" disabled>前へ</button>
           <button id="nextBtn" disabled>次へ</button>
           <button id="stopBtn" disabled>停止</button>
         </div>
@@ -392,6 +390,13 @@
   function renderSegmentList() {
     const ul = $("segmentList");
     ul.innerHTML = "";
+    if (segmentDetails.length === 0) {
+      const empty = document.createElement("li");
+      empty.className = "segment-item";
+      empty.textContent = "区間リストは未生成です。";
+      ul.appendChild(empty);
+      return;
+    }
     for (let i = 0; i < segmentDetails.length; i++) {
       const seg = segmentDetails[i];
       const li = document.createElement("li");
@@ -426,6 +431,10 @@
       el.classList.add("active");
       el.scrollIntoView({ block: "nearest" });
     }
+  }
+
+  function findPlanIndexBySegmentIndex(segIndex) {
+    return playPlan.findIndex(p => p.segIndex === segIndex);
   }
 
   function recomputeGlobalTimeline() {
@@ -974,6 +983,24 @@
     await playPlanItem(nextPlanIndex);
   }
 
+  async function advanceToPrevSegment() {
+    if (planIndex < 0) return;
+    const currentSeg = playPlan[planIndex].segIndex;
+    const prevSeg = currentSeg - 1;
+    if (prevSeg < 0) {
+      stopPlaybackUIOnly();
+      updateButtons();
+      return;
+    }
+    const prevPlanIndex = findPlanIndexBySegmentIndex(prevSeg);
+    if (prevPlanIndex < 0) {
+      stopPlaybackUIOnly();
+      updateButtons();
+      return;
+    }
+    await playPlanItem(prevPlanIndex);
+  }
+
   async function advanceToNextPlanItem() {
     const next = planIndex + 1;
     if (next >= playPlan.length) {
@@ -1074,8 +1101,10 @@
     $("pauseBtn").disabled = !isPlaying;
     if (isPlaying && planIndex >= 0) {
       const currentSeg = playPlan[planIndex].segIndex;
+      $("prevBtn").disabled = !(currentSeg > 0);
       $("nextBtn").disabled = !(currentSeg < segments.length - 1);
     } else {
+      $("prevBtn").disabled = true;
       $("nextBtn").disabled = true;
     }
     $("stopBtn").disabled = !isPlaying;
@@ -1084,15 +1113,6 @@
   // ---------- UI events ----------
   $("fileInput").addEventListener("change", async (e) => {
     const files = e.target.files;
-    $("dirInput").value = "";
-    setDropMsg("");
-    const entries = sortFileEntries(normalizeFiles(files));
-    await loadFilesFromEntries(entries, { orderMode: "default" });
-  });
-
-  $("dirInput").addEventListener("change", async (e) => {
-    const files = e.target.files;
-    $("fileInput").value = "";
     setDropMsg("");
     const entries = sortFileEntries(normalizeFiles(files));
     await loadFilesFromEntries(entries, { orderMode: "default" });
@@ -1100,10 +1120,10 @@
 
   $("clearBtn").addEventListener("click", async () => {
     $("fileInput").value = "";
-    $("dirInput").value = "";
     setDropMsg("");
     await loadFilesFromEntries([]);
   });
+
 
   $("sortResetBtn").addEventListener("click", () => {
     if (tracks.length === 0) return;
@@ -1140,7 +1160,6 @@
       if (anyMedia || !hasItems) {
         const entries = sortFileEntries(normalizeFiles(files));
         $("fileInput").value = "";
-        $("dirInput").value = "";
         await loadFilesFromEntries(entries, { orderMode: "default" });
         return;
       }
@@ -1153,7 +1172,6 @@
         if (collected.length > 0) {
           const entries = sortFileEntries(toIndexedEntries(collected));
           $("fileInput").value = "";
-          $("dirInput").value = "";
           await loadFilesFromEntries(entries, { orderMode: "default" });
           return;
         }
@@ -1165,7 +1183,6 @@
     if (hasFiles) {
       const entries = sortFileEntries(normalizeFiles(files));
       $("fileInput").value = "";
-      $("dirInput").value = "";
       await loadFilesFromEntries(entries, { orderMode: "default" });
       return;
     }
@@ -1205,6 +1222,24 @@
       reorderTracks(dragIndex, toIndex);
     }
     dragIndex = -1;
+  });
+
+  // Segment list shift-click: play from that segment
+  const segmentList = $("segmentList");
+  segmentList.addEventListener("click", async (e) => {
+    if (!e.shiftKey) return;
+    const li = e.target.closest(".segment-item");
+    if (!li || !li.dataset.index) return;
+    const idx = Number(li.dataset.index);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= segments.length) return;
+    const planIdx = findPlanIndexBySegmentIndex(idx);
+    if (planIdx < 0) return;
+    try {
+      await playPlanItem(planIdx);
+      updateButtons();
+    } catch (err) {
+      alert(err.message || String(err));
+    }
   });
 
   $("preset").addEventListener("change", () => {
@@ -1263,6 +1298,12 @@
   $("nextBtn").addEventListener("click", async () => {
     if (!isPlaying) return;
     await advanceToNextSegment();
+    updateButtons();
+  });
+
+  $("prevBtn").addEventListener("click", async () => {
+    if (!isPlaying) return;
+    await advanceToPrevSegment();
     updateButtons();
   });
 

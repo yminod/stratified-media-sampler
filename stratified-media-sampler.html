@@ -5,143 +5,192 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Stratified Media Sampler (Experimental)</title>
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 16px; line-height: 1.35; }
-    h1 { font-size: 18px; margin: 0 0 12px; }
-    fieldset { border: 1px solid #ccc; padding: 12px; margin: 12px 0; }
-    legend { padding: 0 6px; }
+    :root {
+      --ink: #1b1b1f;
+      --muted: #5a5a66;
+      --line: #d8d7d2;
+      --panel: #ffffff;
+      --bg: #f3f0ea;
+      --accent: #176b6b;
+      --accent-2: #c56a2a;
+      --warn: #8a4b00;
+      --err: #b00020;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Avenir Next", "Segoe UI", sans-serif;
+      margin: 0;
+      line-height: 1.4;
+      color: var(--ink);
+      background: radial-gradient(1200px 600px at 20% -10%, #fff7e8 0%, #f3f0ea 45%, #ece7dd 100%);
+    }
+    h1 { font-size: 20px; margin: 0; letter-spacing: 0.02em; }
+    h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+    .app { padding: 16px; max-width: 1200px; margin: 0 auto; }
+    .header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    fieldset { border: 1px solid var(--line); padding: 12px; margin: 10px 0; background: var(--panel); }
+    legend { padding: 0 6px; color: var(--muted); }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .col { display: flex; flex-direction: column; gap: 6px; }
-    label { font-size: 13px; color: #333; }
-    input[type="number"], input[type="text"], select { padding: 6px; font-size: 14px; }
-    button { padding: 8px 10px; font-size: 14px; cursor: pointer; }
+    label { font-size: 13px; color: var(--ink); }
+    input[type="number"], input[type="text"], select { padding: 6px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+    button { padding: 8px 10px; font-size: 14px; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .status { padding: 8px; background: #f6f6f6; border: 1px solid #ddd; }
-    .warn { color: #8a4b00; }
-    .err { color: #b00020; }
+    .status { padding: 8px; background: #f9f7f2; border: 1px solid var(--line); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
-    th, td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
-    th { background: #f2f2f2; text-align: left; }
-    .small { font-size: 12px; color: #555; }
-    .pill { display: inline-block; padding: 2px 6px; border: 1px solid #bbb; border-radius: 999px; font-size: 12px; }
-    .drop-zone { border: 2px dashed #888; padding: 16px; border-radius: 8px; background: #fafafa; text-align: center; }
-    .drop-zone.dragover { background: #f0f6ff; border-color: #3a6ea5; }
+    th, td { border: 1px solid var(--line); padding: 6px; vertical-align: top; }
+    th { background: #f2efe8; text-align: left; }
+    .small { font-size: 12px; color: var(--muted); }
+    .pill { display: inline-block; padding: 2px 6px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+    .drop-zone { border: 2px dashed #8c8a82; padding: 16px; border-radius: 8px; background: #fbfaf7; text-align: center; }
+    .drop-zone.dragover { background: #eef7f7; border-color: var(--accent); }
     .file-list { list-style: none; padding: 0; margin: 6px 0 0; max-height: 220px; overflow: auto; }
-    .file-item { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid #ddd; margin-bottom: 6px; background: #fff; }
+    .file-item { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
     .file-item.dragging { opacity: 0.5; }
-    .drag-handle { cursor: grab; user-select: none; color: #666; }
-    .file-meta { font-size: 12px; color: #666; }
+    .drag-handle { cursor: grab; user-select: none; color: var(--muted); }
+    .file-meta { font-size: 12px; color: var(--muted); }
+    .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .playback-grid { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
+    .segment-list { list-style: none; padding: 0; margin: 0; max-height: 260px; overflow: auto; }
+    .segment-item { padding: 8px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
+    .segment-item.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(23, 107, 107, 0.15); background: #f2fbfb; }
+    .segment-title { font-weight: 600; }
+    .segment-sub { font-size: 12px; color: var(--muted); }
   </style>
 </head>
 <body>
-  <h1>Stratified Media Sampler (Experimental)</h1>
-
-  <fieldset>
-    <legend>1) 入力</legend>
-    <div class="row">
-      <div class="col" style="flex:1;">
-        <div id="dropZone" class="drop-zone">
-          ここにファイルをドラッグ＆ドロップ
-          <div class="small">フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。</div>
-        </div>
-        <div id="dropMsg" class="small" style="margin-top:6px;"></div>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col">
-        <label>複数ファイル選択</label>
-        <input id="fileInput" type="file" multiple accept="audio/*,video/*" />
-        <div class="small">複数の音声/動画ファイルを選択します。</div>
-      </div>
-      <div class="col">
-        <label>ディレクトリ選択（Chrome/Edge）</label>
-        <input id="dirInput" type="file" webkitdirectory directory multiple accept="audio/*,video/*" />
-        <div class="small">ディレクトリ内の全ファイルを取得します（相対パス昇順で並べます）。</div>
-      </div>
-      <div class="col">
-        <button id="clearBtn">クリア</button>
-      </div>
+  <div class="app">
+    <div class="header">
+      <h1>Stratified Media Sampler</h1>
+      <div class="subtle">長尺作品の「おおまかな印象」を確実に掴むためのサンプラー</div>
     </div>
 
-    <div class="status" style="margin-top:10px;">
-      <div><strong>読み込み状態:</strong> <span id="loadState">未選択</span></div>
-      <div class="row" style="margin-top:6px; align-items: center;">
-        <div class="small" id="orderState">並び: 既定</div>
-        <button id="sortResetBtn" disabled>整列</button>
-      </div>
-      <ul class="file-list" id="fileList"></ul>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>2) 層化サンプリング設定</legend>
-
-    <div class="row">
-      <div class="col">
-        <label>プリセット</label>
-        <select id="preset">
-          <option value="custom">カスタム</option>
-          <option value="easy">簡易（20層 × 20秒）</option>
-          <option value="standard" selected>標準（24層 × 30秒）</option>
-          <option value="strict">厳格（40層 × 30秒）</option>
-        </select>
-      </div>
-
-      <div class="col">
-        <label>層の数（N）</label>
-        <input id="layers" type="number" min="1" step="1" value="24" />
-      </div>
-
-      <div class="col">
-        <label>区間長（秒, L）</label>
-        <input id="segLen" type="number" min="1" step="1" value="30" />
-      </div>
-
-      <div class="col">
-        <label>乱数シード（32-bit）</label>
-        <div class="row">
-          <input id="seed" class="mono" type="text" value="" style="width: 180px;" />
-          <button id="regenSeedBtn">自動生成</button>
-          <button id="copySeedBtn">コピー</button>
-        </div>
-        <div class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
-      </div>
-
-      <div class="col">
-        <label>区間の収まり方</label>
-        <div class="row">
-          <input id="singleFileOnly" type="checkbox" />
-          <label for="singleFileOnly">区間は常に1ファイル内</label>
-        </div>
-        <div class="small">オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。</div>
-      </div>
-    </div>
-
-    <div class="status" style="margin-top:10px;">
+  <div class="setup-grid">
+    <fieldset>
+      <legend>1) 入力</legend>
       <div class="row">
-        <div><span class="pill">総尺</span> <span id="totalDur">-</span></div>
-        <div><span class="pill">平均チェック間隔</span> <span id="avgGap">-</span></div>
-        <div><span class="pill">総聴取時間</span> <span id="totalListen">-</span></div>
-        <div><span class="pill">時間比</span> <span id="coverage">-</span></div>
+        <div class="col" style="flex:1;">
+          <div id="dropZone" class="drop-zone">
+            ここにファイルをドラッグ＆ドロップ
+            <div class="small">フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。</div>
+          </div>
+          <div id="dropMsg" class="small" style="margin-top:6px;"></div>
+        </div>
       </div>
-      <div id="warnings" class="small"></div>
-    </div>
+      <div class="row">
+        <div class="col">
+          <label>複数ファイル選択</label>
+          <input id="fileInput" type="file" multiple accept="audio/*,video/*" />
+          <div class="small">複数の音声/動画ファイルを選択します。</div>
+        </div>
+        <div class="col">
+          <label>ディレクトリ選択（Chrome/Edge）</label>
+          <input id="dirInput" type="file" webkitdirectory directory multiple accept="audio/*,video/*" />
+          <div class="small">ディレクトリ内の全ファイルを取得します（相対パス昇順で並べます）。</div>
+        </div>
+        <div class="col">
+          <button id="clearBtn">クリア</button>
+        </div>
+      </div>
 
-    <div class="row" style="margin-top:10px;">
-      <button id="buildBtn" disabled>区間リスト生成</button>
-      <button id="startBtn" disabled>再生開始</button>
-      <button id="pauseBtn" disabled>一時停止/再開</button>
-      <button id="nextBtn" disabled>次へ</button>
-      <button id="stopBtn" disabled>停止</button>
-    </div>
-  </fieldset>
+      <div class="status" style="margin-top:10px;">
+        <div><strong>読み込み状態:</strong> <span id="loadState">未選択</span></div>
+        <div class="row" style="margin-top:6px; align-items: center;">
+          <div class="small" id="orderState">並び: 既定</div>
+          <button id="sortResetBtn" disabled>整列</button>
+        </div>
+        <ul class="file-list" id="fileList"></ul>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2) サンプリング設定</legend>
+
+      <div class="row">
+        <div class="col">
+          <label>プリセット</label>
+          <select id="preset">
+            <option value="custom">カスタム</option>
+            <option value="easy">簡易（20層 × 20秒）</option>
+            <option value="standard" selected>標準（24層 × 30秒）</option>
+            <option value="strict">厳格（40層 × 30秒）</option>
+          </select>
+        </div>
+
+        <div class="col">
+          <label>層の数（N）</label>
+          <input id="layers" type="number" min="1" step="1" value="24" />
+        </div>
+
+        <div class="col">
+          <label>区間長（秒, L）</label>
+          <input id="segLen" type="number" min="1" step="1" value="30" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>乱数シード（32-bit）</label>
+          <div class="row">
+            <input id="seed" class="mono" type="text" value="" style="width: 180px;" />
+            <button id="regenSeedBtn">自動生成</button>
+            <button id="copySeedBtn">コピー</button>
+          </div>
+          <div class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
+        </div>
+
+        <div class="col">
+          <label>区間の収まり方</label>
+          <div class="row">
+            <input id="singleFileOnly" type="checkbox" />
+            <label for="singleFileOnly">区間は常に1ファイル内</label>
+          </div>
+          <div class="small">オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。</div>
+        </div>
+      </div>
+
+      <div class="status" style="margin-top:10px;">
+        <div class="row">
+          <div><span class="pill">総尺</span> <span id="totalDur">-</span></div>
+          <div><span class="pill">平均チェック間隔</span> <span id="avgGap">-</span></div>
+          <div><span class="pill">総聴取時間</span> <span id="totalListen">-</span></div>
+          <div><span class="pill">時間比</span> <span id="coverage">-</span></div>
+        </div>
+        <div id="warnings" class="small"></div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="buildBtn" class="primary" disabled>区間リスト生成</button>
+      </div>
+    </fieldset>
+  </div>
 
   <fieldset>
     <legend>3) 再生</legend>
-    <video id="player" controls style="width:100%;"></video>
-    <div class="status" style="margin-top:10px;">
-      <div><strong>現在:</strong> <span id="nowPlaying">-</span></div>
-      <div class="small mono" id="nowDetail">-</div>
+    <div class="playback-grid">
+      <div>
+        <h2>区間リスト</h2>
+        <ul class="segment-list" id="segmentList"></ul>
+      </div>
+      <div>
+        <h2>再生</h2>
+        <video id="player" controls style="width:100%;"></video>
+        <div class="row" style="margin-top:10px;">
+          <button id="startBtn" disabled>再生開始</button>
+          <button id="pauseBtn" disabled>一時停止/再開</button>
+          <button id="nextBtn" disabled>次へ</button>
+          <button id="stopBtn" disabled>停止</button>
+        </div>
+        <div class="status" style="margin-top:10px;">
+          <div><strong>現在:</strong> <span id="nowPlaying">-</span></div>
+          <div class="small mono" id="nowDetail">-</div>
+        </div>
+      </div>
     </div>
   </fieldset>
 
@@ -166,6 +215,7 @@
       <button id="clearLogBtn">ログを消去</button>
     </div>
   </fieldset>
+  </div>
 
 <script>
 (() => {
@@ -249,6 +299,7 @@
   let rngSeed = autoSeed();
   let rng = mulberry32(rngSeed);
   let logEntries = [];
+  let segmentDetails = [];
 
   // Playback state for boundary-crossing segments
   let planIndex = -1;
@@ -338,6 +389,45 @@
     }
   }
 
+  function renderSegmentList() {
+    const ul = $("segmentList");
+    ul.innerHTML = "";
+    for (let i = 0; i < segmentDetails.length; i++) {
+      const seg = segmentDetails[i];
+      const li = document.createElement("li");
+      li.className = "segment-item";
+      li.dataset.index = String(i);
+
+      const title = document.createElement("div");
+      title.className = "segment-title";
+      title.textContent = `区間 ${i + 1} / ${segmentDetails.length}`;
+
+      const range = document.createElement("div");
+      range.className = "segment-sub";
+      range.textContent = `${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)} (${(seg.globalEnd - seg.globalStart).toFixed(3)}s)`;
+
+      const files = document.createElement("div");
+      files.className = "segment-sub";
+      files.textContent = seg.filesSummary;
+
+      li.appendChild(title);
+      li.appendChild(range);
+      li.appendChild(files);
+      ul.appendChild(li);
+    }
+  }
+
+  function highlightSegment(index) {
+    const ul = $("segmentList");
+    const items = ul.querySelectorAll(".segment-item");
+    items.forEach((el) => el.classList.remove("active"));
+    const el = ul.querySelector(`.segment-item[data-index="${index}"]`);
+    if (el) {
+      el.classList.add("active");
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }
+
   function recomputeGlobalTimeline() {
     let cursor = 0;
     for (let i = 0; i < tracks.length; i++) {
@@ -353,10 +443,12 @@
     segments = [];
     playPlan = [];
     logEntries = [];
+    segmentDetails = [];
     $("logBody").innerHTML = "";
     $("exportLogBtn").disabled = true;
     planIndex = -1;
     stopPlaybackUIOnly();
+    renderSegmentList();
     updateButtons();
   }
 
@@ -372,12 +464,13 @@
     stopPlaybackUIOnly();
 
     if (!entries || entries.length === 0) {
-      $("loadState").textContent = "未選択";
-      renderFileList();
-      updateStats();
-      updateButtons();
-      updateOrderState();
-      return;
+    $("loadState").textContent = "未選択";
+    renderFileList();
+    renderSegmentList();
+    updateStats();
+    updateButtons();
+    updateOrderState();
+    return;
     }
 
     $("loadState").textContent = `duration取得中... (${entries.length} files)`;
@@ -540,20 +633,6 @@
     return all;
   }
 
-  function hasDirectoryItems(items) {
-    const len = items.length || 0;
-    for (let i = 0; i < len; i++) {
-      const item = items[i];
-      if (!item || (item.kind && item.kind !== "file")) continue;
-      try {
-        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
-        if (entry && entry.isDirectory) return true;
-      } catch (e) {
-        // ignore
-      }
-    }
-    return false;
-  }
 
   function reorderTracks(fromIndex, toIndex) {
     if (fromIndex === toIndex) return;
@@ -705,6 +784,23 @@
       }
     }
     playPlan = plan;
+    // Build segment details for display
+    segmentDetails = segments.map((seg, i) => {
+      const parts = playPlan.filter(p => p.segIndex === i);
+      const names = parts.map(p => tracks[p.trackIndex]?.rel || "unknown");
+      const unique = [];
+      for (const n of names) {
+        if (!unique.includes(n)) unique.push(n);
+      }
+      const filesSummary = unique.length <= 2
+        ? unique.join(" → ")
+        : `${unique[0]} → ${unique[1]} (+${unique.length - 2})`;
+      return {
+        globalStart: seg.globalStart,
+        globalEnd: seg.globalEnd,
+        filesSummary: filesSummary || "-"
+      };
+    });
 
     // reset log view
     $("logBody").innerHTML = "";
@@ -714,6 +810,7 @@
     planIndex = -1;
     stopPlaybackUIOnly();
     updateButtons();
+    renderSegmentList();
     renderWarnings();
   }
 
@@ -819,6 +916,7 @@
     $("nowPlaying").textContent = `区間 ${item.segIndex + 1}/${segments.length}${partLabel}: ${fileLabel}`;
     $("nowDetail").textContent =
       `global ${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(tr.duration)})`;
+    highlightSegment(item.segIndex);
   }
 
   function appendLogRow(item, trAtStart) {
@@ -855,6 +953,7 @@
     });
 
     $("exportLogBtn").disabled = false;
+    highlightSegment(item.segIndex);
   }
 
   async function advanceToNextSegment() {
@@ -1203,6 +1302,7 @@
   updateStats();
   updateButtons();
   updateOrderState();
+  renderSegmentList();
 })();
 </script>
 </body>

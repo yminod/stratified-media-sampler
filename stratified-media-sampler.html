@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stratified Media Sampler (Experimental)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 16px; line-height: 1.35; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    fieldset { border: 1px solid #ccc; padding: 12px; margin: 12px 0; }
+    legend { padding: 0 6px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .col { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: 13px; color: #333; }
+    input[type="number"], input[type="text"], select { padding: 6px; font-size: 14px; }
+    button { padding: 8px 10px; font-size: 14px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .status { padding: 8px; background: #f6f6f6; border: 1px solid #ddd; }
+    .warn { color: #8a4b00; }
+    .err { color: #b00020; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
+    th { background: #f2f2f2; text-align: left; }
+    .small { font-size: 12px; color: #555; }
+    .pill { display: inline-block; padding: 2px 6px; border: 1px solid #bbb; border-radius: 999px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Stratified Media Sampler (Experimental)</h1>
+
+  <fieldset>
+    <legend>1) 入力</legend>
+    <div class="row">
+      <div class="col">
+        <label>複数ファイル選択</label>
+        <input id="fileInput" type="file" multiple accept="audio/*,video/*" />
+        <div class="small">複数の音声/動画ファイルを選択します。</div>
+      </div>
+      <div class="col">
+        <label>ディレクトリ選択（Chrome/Edge）</label>
+        <input id="dirInput" type="file" webkitdirectory directory multiple accept="audio/*,video/*" />
+        <div class="small">ディレクトリ内の全ファイルを取得します（相対パス昇順で並べます）。</div>
+      </div>
+      <div class="col">
+        <button id="clearBtn">クリア</button>
+      </div>
+    </div>
+
+    <div class="status" style="margin-top:10px;">
+      <div><strong>読み込み状態:</strong> <span id="loadState">未選択</span></div>
+      <div class="small mono" id="fileList"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>2) 層化サンプリング設定</legend>
+
+    <div class="row">
+      <div class="col">
+        <label>プリセット</label>
+        <select id="preset">
+          <option value="custom">カスタム</option>
+          <option value="easy">簡易（20層 × 20秒）</option>
+          <option value="standard" selected>標準（24層 × 30秒）</option>
+          <option value="strict">厳格（40層 × 30秒）</option>
+        </select>
+      </div>
+
+      <div class="col">
+        <label>層の数（N）</label>
+        <input id="layers" type="number" min="1" step="1" value="24" />
+      </div>
+
+      <div class="col">
+        <label>区間長（秒, L）</label>
+        <input id="segLen" type="number" min="1" step="1" value="30" />
+      </div>
+
+      <div class="col">
+        <label>乱数シード（32-bit）</label>
+        <div class="row">
+          <input id="seed" class="mono" type="text" value="" style="width: 180px;" />
+          <button id="regenSeedBtn">自動生成</button>
+          <button id="copySeedBtn">コピー</button>
+        </div>
+        <div class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
+      </div>
+    </div>
+
+    <div class="status" style="margin-top:10px;">
+      <div class="row">
+        <div><span class="pill">総尺</span> <span id="totalDur">-</span></div>
+        <div><span class="pill">平均チェック間隔</span> <span id="avgGap">-</span></div>
+        <div><span class="pill">総聴取時間</span> <span id="totalListen">-</span></div>
+        <div><span class="pill">時間比</span> <span id="coverage">-</span></div>
+      </div>
+      <div id="warnings" class="small"></div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="buildBtn" disabled>区間リスト生成</button>
+      <button id="startBtn" disabled>再生開始</button>
+      <button id="pauseBtn" disabled>一時停止/再開</button>
+      <button id="nextBtn" disabled>次へ</button>
+      <button id="stopBtn" disabled>停止</button>
+      <button id="exportLogBtn" disabled>ログ(JSON)をコピー</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>3) 再生</legend>
+    <video id="player" controls style="width:100%;"></video>
+    <div class="status" style="margin-top:10px;">
+      <div><strong>現在:</strong> <span id="nowPlaying">-</span></div>
+      <div class="small mono" id="nowDetail">-</div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>4) ログ</legend>
+    <div class="small">「どのファイルのどの区間を再生したか」を追記します。</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>層</th>
+          <th>全体タイムライン（秒）</th>
+          <th>ファイル</th>
+          <th>ファイル内（秒）</th>
+          <th>seed / 設定</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </fieldset>
+
+<script>
+(() => {
+  // ---------- Utilities ----------
+  const $ = (id) => document.getElementById(id);
+
+  function fmtTime(sec) {
+    if (!isFinite(sec)) return "-";
+    const s = Math.max(0, sec);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    const rs = r.toFixed(3);
+    const [ri, rf] = rs.split(".");
+    return `${pad(h)}:${pad(m)}:${pad(Number(ri))}.${rf}`;
+  }
+
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+
+  // Deterministic PRNG: mulberry32
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function() {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function autoSeed() {
+    const u = new Uint32Array(1);
+    crypto.getRandomValues(u);
+    return u[0] >>> 0;
+  }
+
+  function parseSeed(s) {
+    const trimmed = (s || "").trim();
+    if (!trimmed) return null;
+    // allow decimal or hex (0x...)
+    let v = null;
+    if (/^0x[0-9a-f]+$/i.test(trimmed)) v = parseInt(trimmed, 16);
+    else if (/^\d+$/.test(trimmed)) v = parseInt(trimmed, 10);
+    else return null;
+    if (!Number.isFinite(v)) return null;
+    return (v >>> 0);
+  }
+
+  // ---------- State ----------
+  /** @type {{file: File, name: string, rel: string, duration: number, startGlobal: number, endGlobal: number}[]} */
+  let tracks = [];
+  let totalDuration = 0;
+
+  /** segments: each is {layerIndex, globalStart, globalEnd} */
+  let segments = [];
+  /**
+   * playPlan: each is {
+   *   segIndex, layerIndex, segGlobalStart, segGlobalEnd,
+   *   trackIndex, localStart, localEnd, partIndex, partCount
+   * }
+   */
+  let playPlan = [];
+  let rngSeed = autoSeed();
+  let rng = mulberry32(rngSeed);
+
+  // Playback state for boundary-crossing segments
+  let planIndex = -1;
+  let currentTrackIndex = -1;
+  let isPlaying = false;
+  let isPaused = false;
+
+  const player = $("player");
+
+  // ---------- File loading / duration scanning ----------
+  async function getDurationForFile(file) {
+    // Use an <audio> element to read metadata duration
+    return new Promise((resolve, reject) => {
+      const a = document.createElement("audio");
+      a.preload = "metadata";
+      const url = URL.createObjectURL(file);
+      a.src = url;
+
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        a.src = "";
+      };
+
+      a.addEventListener("loadedmetadata", () => {
+        const d = a.duration;
+        cleanup();
+        if (!isFinite(d) || d <= 0) reject(new Error(`duration unavailable: ${file.name}`));
+        else resolve(d);
+      }, { once: true });
+
+      a.addEventListener("error", () => {
+        cleanup();
+        reject(new Error(`cannot load: ${file.name}`));
+      }, { once: true });
+    });
+  }
+
+  function sortFiles(files) {
+    // prefer relativePath if present (directory input)
+    const arr = Array.from(files).map(f => {
+      const rel = f.webkitRelativePath || "";
+      const key = rel ? rel : f.name;
+      return { file: f, key, rel };
+    });
+    arr.sort((a, b) => a.key.localeCompare(b.key, "en"));
+    return arr;
+  }
+
+  async function loadFiles(files) {
+    tracks = [];
+    segments = [];
+    playPlan = [];
+    totalDuration = 0;
+    planIndex = -1;
+    stopPlaybackUIOnly();
+
+    if (!files || files.length === 0) {
+      $("loadState").textContent = "未選択";
+      $("fileList").textContent = "";
+      updateStats();
+      updateButtons();
+      return;
+    }
+
+    $("loadState").textContent = `duration取得中... (${files.length} files)`;
+    $("fileList").textContent = "";
+
+    const sorted = sortFiles(files);
+    const listLines = [];
+    let cursor = 0;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const { file, key, rel } = sorted[i];
+      // Basic filtering: audio/* or video/*
+      if (!(file.type.startsWith("audio/") || file.type.startsWith("video/"))) continue;
+
+      try {
+        const d = await getDurationForFile(file);
+        const startGlobal = cursor;
+        const endGlobal = cursor + d;
+
+        tracks.push({
+          file,
+          name: file.name,
+          rel: rel || file.name,
+          duration: d,
+          startGlobal,
+          endGlobal
+        });
+
+        cursor = endGlobal;
+        listLines.push(`${String(tracks.length).padStart(3," ")}  ${rel || file.name}  (${d.toFixed(3)}s)`);
+      } catch (e) {
+        listLines.push(`ERR  ${key}  (${e.message})`);
+      }
+    }
+
+    totalDuration = cursor;
+
+    $("loadState").textContent = `読み込み完了: ${tracks.length} files, total ${totalDuration.toFixed(3)}s`;
+    $("fileList").textContent = listLines.slice(0, 60).join("\n") + (listLines.length > 60 ? `\n... (${listLines.length-60} more)` : "");
+
+    updateStats();
+    updateButtons();
+  }
+
+  // ---------- Stratified segment generation ----------
+  function buildSegments() {
+    const N = Number($("layers").value);
+    const L = Number($("segLen").value);
+    const seedVal = parseSeed($("seed").value);
+    if (seedVal === null) {
+      rngSeed = autoSeed();
+      $("seed").value = String(rngSeed);
+    } else {
+      rngSeed = seedVal;
+    }
+    rng = mulberry32(rngSeed);
+
+    if (!Number.isFinite(totalDuration) || totalDuration <= 0) throw new Error("総尺が取得できていません。");
+    if (!Number.isFinite(N) || N < 1) throw new Error("層数が不正です。");
+    if (!Number.isFinite(L) || L < 1) throw new Error("区間長が不正です。");
+
+    const layerWidth = totalDuration / N;
+    segments = [];
+    playPlan = [];
+
+    for (let i = 0; i < N; i++) {
+      const layerStart = i * layerWidth;
+      const layerEnd = (i + 1) * layerWidth;
+
+      // choose a global start such that [start, start+L] fits within the layer.
+      // If L > layerWidth, clamp to layerStart (still generate, but will warn and may cross)
+      let startMin = layerStart;
+      let startMax = layerEnd - L;
+
+      if (startMax < startMin) {
+        // can't fit; fallback to layerStart and let it cross layer boundary
+        startMax = startMin;
+      }
+
+      const r = rng();
+      const gStart = startMin + (startMax - startMin) * r;
+      const gEnd = gStart + L;
+
+      segments.push({
+        layerIndex: i + 1,
+        globalStart: gStart,
+        globalEnd: gEnd
+      });
+    }
+
+    // Build playback plan (split segments by file boundaries)
+    const plan = [];
+    for (let si = 0; si < segments.length; si++) {
+      const seg = segments[si];
+      const overlaps = [];
+      for (let ti = 0; ti < tracks.length; ti++) {
+        const tr = tracks[ti];
+        const g0 = Math.max(seg.globalStart, tr.startGlobal);
+        const g1 = Math.min(seg.globalEnd, tr.endGlobal);
+        if (g1 <= g0) continue;
+        overlaps.push({
+          trackIndex: ti,
+          localStart: g0 - tr.startGlobal,
+          localEnd: g1 - tr.startGlobal
+        });
+      }
+      const partCount = overlaps.length;
+      for (let pi = 0; pi < overlaps.length; pi++) {
+        const o = overlaps[pi];
+        plan.push({
+          segIndex: si,
+          layerIndex: seg.layerIndex,
+          segGlobalStart: seg.globalStart,
+          segGlobalEnd: seg.globalEnd,
+          trackIndex: o.trackIndex,
+          localStart: o.localStart,
+          localEnd: o.localEnd,
+          partIndex: pi + 1,
+          partCount
+        });
+      }
+    }
+    playPlan = plan;
+
+    // reset log view
+    $("logBody").innerHTML = "";
+    $("exportLogBtn").disabled = true;
+
+    planIndex = -1;
+    stopPlaybackUIOnly();
+    updateButtons();
+    renderWarnings();
+  }
+
+  // ---------- Mapping global time to file/local time ----------
+  function findTrackByGlobalTime(t) {
+    // Find the track where startGlobal <= t < endGlobal
+    // Linear scan is OK for small N; can optimize with binary search later.
+    for (let i = 0; i < tracks.length; i++) {
+      if (t >= tracks[i].startGlobal && t < tracks[i].endGlobal) return i;
+    }
+    // boundary case: if t == totalDuration, use last track
+    if (t === totalDuration && tracks.length > 0) return tracks.length - 1;
+    return -1;
+  }
+
+  // ---------- Playback engine (supports crossing file boundaries) ----------
+  function setPlayerSourceForTrack(trackIndex) {
+    const tr = tracks[trackIndex];
+    if (!tr) throw new Error("trackIndex out of range");
+    // revoke previous object URL if any
+    if (player.dataset.objUrl) {
+      URL.revokeObjectURL(player.dataset.objUrl);
+      delete player.dataset.objUrl;
+    }
+    const url = URL.createObjectURL(tr.file);
+    player.dataset.objUrl = url;
+    player.src = url;
+  }
+
+  function stopPlaybackUIOnly() {
+    isPlaying = false;
+    isPaused = false;
+    currentTrackIndex = -1;
+    planIndex = -1;
+    player.pause();
+    // keep src as-is; but it's okay
+    $("nowPlaying").textContent = "-";
+    $("nowDetail").textContent = "-";
+  }
+
+  async function playPlanItem(index) {
+    if (index < 0 || index >= playPlan.length) return;
+
+    planIndex = index;
+    const item = playPlan[planIndex];
+
+    const ti = item.trackIndex;
+    if (ti < 0 || ti >= tracks.length) throw new Error("開始位置がどのファイルにもマップできません。");
+
+    currentTrackIndex = ti;
+
+    // prepare current track
+    setPlayerSourceForTrack(currentTrackIndex);
+
+    // wait until loaded enough to seek and play
+    await new Promise((resolve, reject) => {
+      const onReady = () => { cleanup(); resolve(); };
+      const onErr = () => { cleanup(); reject(new Error("audio load error")); };
+      const cleanup = () => {
+        player.removeEventListener("loadedmetadata", onReady);
+        player.removeEventListener("error", onErr);
+      };
+      player.addEventListener("loadedmetadata", onReady);
+      player.addEventListener("error", onErr);
+      // in case metadata is already available
+      if (player.readyState >= 1) { cleanup(); resolve(); }
+    });
+
+    const tr = tracks[currentTrackIndex];
+    const localStart = item.localStart;
+
+    // Seek
+    player.currentTime = clamp(localStart, 0, Math.max(0, tr.duration - 0.001));
+
+    // Update UI
+    isPlaying = true;
+    isPaused = false;
+    updateNowUI();
+
+    // Log segment-part (per file)
+    appendLogRow(item, tr);
+
+    // Play
+    await player.play();
+
+    updateButtons();
+  }
+
+  function updateNowUI() {
+    if (planIndex < 0 || planIndex >= playPlan.length || currentTrackIndex < 0) {
+      $("nowPlaying").textContent = "-";
+      $("nowDetail").textContent = "-";
+      return;
+    }
+    const item = playPlan[planIndex];
+    const seg = segments[item.segIndex];
+    const tr = tracks[currentTrackIndex];
+    const local = player.currentTime;
+    const globalNow = tr.startGlobal + local;
+
+    const fileLabel = tr.rel;
+    const partLabel = item.partCount > 1 ? ` / part ${item.partIndex}/${item.partCount}` : "";
+    $("nowPlaying").textContent = `区間 ${item.segIndex + 1}/${segments.length}（層${seg.layerIndex}）${partLabel}: ${fileLabel}`;
+    $("nowDetail").textContent =
+      `global ${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(tr.duration)})`;
+  }
+
+  function appendLogRow(item, trAtStart) {
+    const tbody = $("logBody");
+
+    const g0 = item.segGlobalStart;
+    const g1 = item.segGlobalEnd;
+    const local0 = item.localStart;
+    const local1 = item.localEnd;
+
+    const tr = document.createElement("tr");
+    const partSuffix = item.partCount > 1 ? `  (part ${item.partIndex}/${item.partCount})` : "";
+    const cells = [
+      String(item.segIndex + 1),
+      String(item.layerIndex),
+      `${fmtTime(g0)} → ${fmtTime(g1)} (${(g1-g0).toFixed(3)}s)`,
+      `${trAtStart.rel}`,
+      `${fmtTime(local0)} → ${fmtTime(local1)}${partSuffix}`,
+      `seed=${rngSeed} / N=${$("layers").value}, L=${$("segLen").value}s`
+    ];
+
+    for (const c of cells) {
+      const td = document.createElement("td");
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+
+    $("exportLogBtn").disabled = false;
+  }
+
+  async function advanceToNextSegment() {
+    if (planIndex < 0) return;
+    const currentSeg = playPlan[planIndex].segIndex;
+    const nextSeg = currentSeg + 1;
+    if (nextSeg >= segments.length) {
+      stopPlaybackUIOnly();
+      updateButtons();
+      return;
+    }
+    const nextPlanIndex = playPlan.findIndex(p => p.segIndex === nextSeg);
+    if (nextPlanIndex < 0) {
+      stopPlaybackUIOnly();
+      updateButtons();
+      return;
+    }
+    await playPlanItem(nextPlanIndex);
+  }
+
+  async function advanceToNextPlanItem() {
+    const next = planIndex + 1;
+    if (next >= playPlan.length) {
+      stopPlaybackUIOnly();
+      updateButtons();
+      return;
+    }
+    await playPlanItem(next);
+  }
+
+  // Stop at segment end, including boundary crossing
+  player.addEventListener("timeupdate", async () => {
+    if (!isPlaying || isPaused) return;
+    if (planIndex < 0 || currentTrackIndex < 0) return;
+
+    const tr = tracks[currentTrackIndex];
+    const item = playPlan[planIndex];
+    const globalNow = tr.startGlobal + player.currentTime;
+
+    updateNowUI();
+
+    // Stop at the end of the current plan item, then advance
+    if (player.currentTime >= item.localEnd - 0.020) { // 20ms tolerance
+      player.pause();
+      await advanceToNextPlanItem();
+    }
+  });
+
+  // If file ended before segment end, jump to next file and continue same segment
+  player.addEventListener("ended", async () => {
+    if (!isPlaying || isPaused) return;
+    if (planIndex < 0) return;
+    await advanceToNextPlanItem();
+  });
+
+  // ---------- Stats / warnings ----------
+  function updateStats() {
+    $("totalDur").textContent = totalDuration > 0 ? `${fmtTime(totalDuration)} (${totalDuration.toFixed(3)}s)` : "-";
+
+    const N = Number($("layers").value);
+    const L = Number($("segLen").value);
+
+    if (totalDuration > 0 && Number.isFinite(N) && N > 0) {
+      const gap = totalDuration / N;
+      $("avgGap").textContent = `${fmtTime(gap)}（≈ ${ (gap/60).toFixed(1) } min/層）`;
+    } else {
+      $("avgGap").textContent = "-";
+    }
+
+    if (Number.isFinite(N) && Number.isFinite(L) && N > 0 && L > 0) {
+      const listen = N * L;
+      $("totalListen").textContent = `${fmtTime(listen)}（${listen.toFixed(0)}s）`;
+      if (totalDuration > 0) {
+        const cov = (listen / totalDuration) * 100;
+        $("coverage").textContent = `${cov.toFixed(2)}%`;
+      } else {
+        $("coverage").textContent = "-";
+      }
+    } else {
+      $("totalListen").textContent = "-";
+      $("coverage").textContent = "-";
+    }
+
+    renderWarnings();
+  }
+
+  function renderWarnings() {
+    const msgs = [];
+    const N = Number($("layers").value);
+    const L = Number($("segLen").value);
+
+    if (tracks.length === 0) msgs.push(`<span class="warn">音声ファイルが読み込まれていません。</span>`);
+    if (totalDuration > 0 && Number.isFinite(N) && N > 0 && Number.isFinite(L) && L > 0) {
+      const layerWidth = totalDuration / N;
+      if (L > layerWidth) {
+        msgs.push(`<span class="warn">区間長 L=${L}s が層幅 S=${layerWidth.toFixed(3)}s を超えています。層内に収まらないため、層境界を跨ぐ区間が発生します（層化の意味が弱まります）。</span>`);
+      }
+      // Heuristic: warn if any track shorter than L (may cause frequent boundary crossing)
+      const shortest = tracks.reduce((m, t) => Math.min(m, t.duration), Infinity);
+      if (isFinite(shortest) && shortest < L) {
+        msgs.push(`<span class="warn">最短ファイル長が区間長より短いです（${shortest.toFixed(3)}s < ${L}s）。ファイル境界跨ぎが頻発します。</span>`);
+      }
+    }
+    $("warnings").innerHTML = msgs.join("<br>") || `<span class="small">OK</span>`;
+  }
+
+  function updateButtons() {
+    const hasTracks = tracks.length > 0 && totalDuration > 0;
+    $("buildBtn").disabled = !hasTracks;
+
+    const hasPlan = playPlan.length > 0;
+    $("startBtn").disabled = !(hasPlan && !isPlaying);
+    $("pauseBtn").disabled = !isPlaying;
+    if (isPlaying && planIndex >= 0) {
+      const currentSeg = playPlan[planIndex].segIndex;
+      $("nextBtn").disabled = !(currentSeg < segments.length - 1);
+    } else {
+      $("nextBtn").disabled = true;
+    }
+    $("stopBtn").disabled = !isPlaying;
+  }
+
+  // ---------- UI events ----------
+  $("fileInput").addEventListener("change", async (e) => {
+    const files = e.target.files;
+    $("dirInput").value = "";
+    await loadFiles(files);
+  });
+
+  $("dirInput").addEventListener("change", async (e) => {
+    const files = e.target.files;
+    $("fileInput").value = "";
+    await loadFiles(files);
+  });
+
+  $("clearBtn").addEventListener("click", async () => {
+    $("fileInput").value = "";
+    $("dirInput").value = "";
+    await loadFiles([]);
+  });
+
+  $("preset").addEventListener("change", () => {
+    const p = $("preset").value;
+    if (p === "easy") { $("layers").value = 20; $("segLen").value = 20; }
+    else if (p === "standard") { $("layers").value = 24; $("segLen").value = 30; }
+    else if (p === "strict") { $("layers").value = 40; $("segLen").value = 30; }
+    updateStats();
+  });
+
+  $("layers").addEventListener("input", () => { $("preset").value = "custom"; updateStats(); });
+  $("segLen").addEventListener("input", () => { $("preset").value = "custom"; updateStats(); });
+
+  $("regenSeedBtn").addEventListener("click", () => {
+    rngSeed = autoSeed();
+    $("seed").value = String(rngSeed);
+  });
+
+  $("copySeedBtn").addEventListener("click", async () => {
+    const s = $("seed").value.trim() || String(rngSeed);
+    await navigator.clipboard.writeText(s);
+  });
+
+  $("buildBtn").addEventListener("click", () => {
+    try {
+      buildSegments();
+      $("loadState").textContent = `${tracks.length} files, total ${totalDuration.toFixed(3)}s / segments built: ${segments.length}`;
+      updateButtons();
+    } catch (e) {
+      alert(e.message || String(e));
+    }
+  });
+
+  $("startBtn").addEventListener("click", async () => {
+    try {
+      await playPlanItem(0);
+      updateButtons();
+    } catch (e) {
+      alert(e.message || String(e));
+    }
+  });
+
+  $("pauseBtn").addEventListener("click", async () => {
+    if (!isPlaying) return;
+    if (!isPaused) {
+      isPaused = true;
+      player.pause();
+    } else {
+      isPaused = false;
+      await player.play();
+    }
+    updateButtons();
+  });
+
+  $("nextBtn").addEventListener("click", async () => {
+    if (!isPlaying) return;
+    await advanceToNextSegment();
+    updateButtons();
+  });
+
+  $("stopBtn").addEventListener("click", () => {
+    stopPlaybackUIOnly();
+    updateButtons();
+  });
+
+  $("exportLogBtn").addEventListener("click", async () => {
+    // Export current log table as JSON (planned mapping per segment)
+    const log = [];
+    const rows = $("logBody").querySelectorAll("tr");
+    rows.forEach((tr, i) => {
+      const tds = tr.querySelectorAll("td");
+      log.push({
+        index: i + 1,
+        layer: tds[1]?.textContent ?? "",
+        global: tds[2]?.textContent ?? "",
+        file: tds[3]?.textContent ?? "",
+        local: tds[4]?.textContent ?? "",
+        meta: tds[5]?.textContent ?? ""
+      });
+    });
+
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      seed: rngSeed,
+      layers: Number($("layers").value),
+      segmentLengthSec: Number($("segLen").value),
+      totalDurationSec: totalDuration,
+      fileOrder: tracks.map(t => t.rel),
+      log
+    };
+
+    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+  });
+
+  // Init seed
+  rngSeed = autoSeed();
+  $("seed").value = String(rngSeed);
+
+  updateStats();
+  updateButtons();
+})();
+</script>
+</body>
+</html>

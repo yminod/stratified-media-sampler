@@ -86,6 +86,15 @@
         </div>
         <div class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
       </div>
+
+      <div class="col">
+        <label>区間の収まり方</label>
+        <div class="row">
+          <input id="singleFileOnly" type="checkbox" />
+          <label for="singleFileOnly">区間は常に1ファイル内</label>
+        </div>
+        <div class="small">オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。</div>
+      </div>
     </div>
 
     <div class="status" style="margin-top:10px;">
@@ -104,7 +113,6 @@
       <button id="pauseBtn" disabled>一時停止/再開</button>
       <button id="nextBtn" disabled>次へ</button>
       <button id="stopBtn" disabled>停止</button>
-      <button id="exportLogBtn" disabled>ログ(JSON)をコピー</button>
     </div>
   </fieldset>
 
@@ -119,12 +127,14 @@
 
   <fieldset>
     <legend>4) ログ</legend>
-    <div class="small">「どのファイルのどの区間を再生したか」を追記します。</div>
+    <div class="row" style="margin-bottom:8px;">
+      <div class="small">「どのファイルのどの区間を再生したか」を追記します。</div>
+      <button id="exportLogBtn" disabled>ログ(JSON)をコピー</button>
+    </div>
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>層</th>
           <th>全体タイムライン（秒）</th>
           <th>ファイル</th>
           <th>ファイル内（秒）</th>
@@ -133,6 +143,9 @@
       </thead>
       <tbody id="logBody"></tbody>
     </table>
+    <div class="row" style="margin-top:8px;">
+      <button id="clearLogBtn">ログを消去</button>
+    </div>
   </fieldset>
 
 <script>
@@ -187,6 +200,7 @@
   /** @type {{file: File, name: string, rel: string, duration: number, startGlobal: number, endGlobal: number}[]} */
   let tracks = [];
   let totalDuration = 0;
+  let lastBuildFallbackLayers = [];
 
   /** segments: each is {layerIndex, globalStart, globalEnd} */
   let segments = [];
@@ -252,6 +266,7 @@
     segments = [];
     playPlan = [];
     totalDuration = 0;
+    lastBuildFallbackLayers = [];
     planIndex = -1;
     stopPlaybackUIOnly();
 
@@ -309,6 +324,7 @@
   function buildSegments() {
     const N = Number($("layers").value);
     const L = Number($("segLen").value);
+    const singleFileOnly = $("singleFileOnly").checked;
     const seedVal = parseSeed($("seed").value);
     if (seedVal === null) {
       rngSeed = autoSeed();
@@ -325,24 +341,70 @@
     const layerWidth = totalDuration / N;
     segments = [];
     playPlan = [];
+    lastBuildFallbackLayers = [];
 
     for (let i = 0; i < N; i++) {
       const layerStart = i * layerWidth;
       const layerEnd = (i + 1) * layerWidth;
 
-      // choose a global start such that [start, start+L] fits within the layer.
-      // If L > layerWidth, clamp to layerStart (still generate, but will warn and may cross)
-      let startMin = layerStart;
-      let startMax = layerEnd - L;
+      let gStart = layerStart;
+      let gEnd = layerStart + L;
 
-      if (startMax < startMin) {
-        // can't fit; fallback to layerStart and let it cross layer boundary
-        startMax = startMin;
+      if (singleFileOnly) {
+        // Build valid start ranges where a segment of length L fits within both the layer and a single file
+        const ranges = [];
+        let totalRange = 0;
+        for (let ti = 0; ti < tracks.length; ti++) {
+          const tr = tracks[ti];
+          const startMin = Math.max(layerStart, tr.startGlobal);
+          const startMax = Math.min(layerEnd, tr.endGlobal) - L;
+          if (startMax >= startMin) {
+            const len = startMax - startMin;
+            ranges.push({ startMin, startMax, len });
+            totalRange += len;
+          }
+        }
+
+        if (totalRange > 0) {
+          let r = rng() * totalRange;
+          for (const range of ranges) {
+            if (r <= range.len) {
+              gStart = range.startMin + r;
+              break;
+            }
+            r -= range.len;
+          }
+        } else if (ranges.length > 0) {
+          // All valid ranges are zero-length; pick one deterministically
+          const idx = Math.floor(rng() * ranges.length);
+          gStart = ranges[idx].startMin;
+        } else {
+          // No valid single-file range; fallback to default behavior
+          lastBuildFallbackLayers.push(i + 1);
+          let startMin = layerStart;
+          let startMax = layerEnd - L;
+          if (startMax < startMin) {
+            startMax = startMin;
+          }
+          const r = rng();
+          gStart = startMin + (startMax - startMin) * r;
+        }
+        gEnd = gStart + L;
+      } else {
+        // choose a global start such that [start, start+L] fits within the layer.
+        // If L > layerWidth, clamp to layerStart (still generate, but will warn and may cross)
+        let startMin = layerStart;
+        let startMax = layerEnd - L;
+
+        if (startMax < startMin) {
+          // can't fit; fallback to layerStart and let it cross layer boundary
+          startMax = startMin;
+        }
+
+        const r = rng();
+        gStart = startMin + (startMax - startMin) * r;
+        gEnd = gStart + L;
       }
-
-      const r = rng();
-      const gStart = startMin + (startMax - startMin) * r;
-      const gEnd = gStart + L;
 
       segments.push({
         layerIndex: i + 1,
@@ -494,7 +556,7 @@
 
     const fileLabel = tr.rel;
     const partLabel = item.partCount > 1 ? ` / part ${item.partIndex}/${item.partCount}` : "";
-    $("nowPlaying").textContent = `区間 ${item.segIndex + 1}/${segments.length}（層${seg.layerIndex}）${partLabel}: ${fileLabel}`;
+    $("nowPlaying").textContent = `区間 ${item.segIndex + 1}/${segments.length}${partLabel}: ${fileLabel}`;
     $("nowDetail").textContent =
       `global ${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(tr.duration)})`;
   }
@@ -511,7 +573,6 @@
     const partSuffix = item.partCount > 1 ? `  (part ${item.partIndex}/${item.partCount})` : "";
     const cells = [
       String(item.segIndex + 1),
-      String(item.layerIndex),
       `${fmtTime(g0)} → ${fmtTime(g1)} (${(g1-g0).toFixed(3)}s)`,
       `${trAtStart.rel}`,
       `${fmtTime(local0)} → ${fmtTime(local1)}${partSuffix}`,
@@ -616,8 +677,9 @@
     const msgs = [];
     const N = Number($("layers").value);
     const L = Number($("segLen").value);
+    const singleFileOnly = $("singleFileOnly").checked;
 
-    if (tracks.length === 0) msgs.push(`<span class="warn">音声ファイルが読み込まれていません。</span>`);
+    if (tracks.length === 0) msgs.push(`<span class="warn">メディアファイルが読み込まれていません。</span>`);
     if (totalDuration > 0 && Number.isFinite(N) && N > 0 && Number.isFinite(L) && L > 0) {
       const layerWidth = totalDuration / N;
       if (L > layerWidth) {
@@ -628,6 +690,10 @@
       if (isFinite(shortest) && shortest < L) {
         msgs.push(`<span class="warn">最短ファイル長が区間長より短いです（${shortest.toFixed(3)}s < ${L}s）。ファイル境界跨ぎが頻発します。</span>`);
       }
+    }
+    if (singleFileOnly && lastBuildFallbackLayers.length > 0) {
+      const list = lastBuildFallbackLayers.join(", ");
+      msgs.push(`<span class="warn">「区間は常に1ファイル内」設定に合致する範囲がない層があります（層: ${list}）。これらは例外的に既定挙動で生成しました。</span>`);
     }
     $("warnings").innerHTML = msgs.join("<br>") || `<span class="small">OK</span>`;
   }
@@ -677,6 +743,7 @@
 
   $("layers").addEventListener("input", () => { $("preset").value = "custom"; updateStats(); });
   $("segLen").addEventListener("input", () => { $("preset").value = "custom"; updateStats(); });
+  $("singleFileOnly").addEventListener("change", () => { updateStats(); });
 
   $("regenSeedBtn").addEventListener("click", () => {
     rngSeed = autoSeed();
@@ -738,11 +805,10 @@
       const tds = tr.querySelectorAll("td");
       log.push({
         index: i + 1,
-        layer: tds[1]?.textContent ?? "",
-        global: tds[2]?.textContent ?? "",
-        file: tds[3]?.textContent ?? "",
-        local: tds[4]?.textContent ?? "",
-        meta: tds[5]?.textContent ?? ""
+        global: tds[1]?.textContent ?? "",
+        file: tds[2]?.textContent ?? "",
+        local: tds[3]?.textContent ?? "",
+        meta: tds[4]?.textContent ?? ""
       });
     });
 
@@ -751,12 +817,18 @@
       seed: rngSeed,
       layers: Number($("layers").value),
       segmentLengthSec: Number($("segLen").value),
+      singleFileOnly: $("singleFileOnly").checked,
       totalDurationSec: totalDuration,
       fileOrder: tracks.map(t => t.rel),
       log
     };
 
     await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+  });
+
+  $("clearLogBtn").addEventListener("click", () => {
+    $("logBody").innerHTML = "";
+    $("exportLogBtn").disabled = true;
   });
 
   // Init seed

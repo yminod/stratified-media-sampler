@@ -57,6 +57,7 @@
     .file-list { list-style: none; padding: 0; margin: 6px 0 0; max-height: 220px; overflow: auto; }
     .file-item { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
     .file-item.dragging { opacity: 0.5; }
+    .file-item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(23, 107, 107, 0.12); background: #f2fbfb; }
     .drag-handle {
       width: 14px;
       height: 22px;
@@ -87,6 +88,7 @@
       border-top: 6px solid currentColor;
     }
     .file-meta { font-size: 12px; color: var(--muted); }
+    .reorder-btn { width: 100%; }
     .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
     .playback-grid { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
     .segment-list { list-style: none; padding: 0; margin: 0; min-height: 320px; max-height: 60vh; overflow: auto; }
@@ -164,7 +166,6 @@
           <label id="fileInputLabel">複数ファイル選択</label>
           <input id="fileInput" class="sr-only" type="file" multiple accept="audio/*,video/*" />
           <button id="fileInputBtn" type="button">ファイルを選ぶ</button>
-          <div id="fileInputHint" class="small">ドラッグ&ドロップが使えない場合の代替手段です。</div>
         </div>
       </div>
 
@@ -174,7 +175,9 @@
           <div class="small" id="orderState">並び: 既定</div>
           <button id="sortResetBtn" disabled>整列</button>
         </div>
+        <button id="moveUpBtn" class="reorder-btn" type="button" disabled>▲</button>
         <ul class="file-list" id="fileList"></ul>
+        <button id="moveDownBtn" class="reorder-btn" type="button" disabled>▼</button>
       </div>
       <div class="row" style="margin-top:8px; justify-content: flex-start; align-self: end;">
         <button id="clearBtn">クリア</button>
@@ -308,7 +311,6 @@
       dropZoneHint: "フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。",
       fileInputLabel: "複数ファイル選択",
       fileInputBtn: "ファイルを選ぶ",
-      fileInputHint: "ドラッグ&ドロップが使えない場合の代替手段です。",
       loadStateLabel: "読み込み状態:",
       loadStateNone: "未選択",
       loadStateLoading: ({ count }) => `duration取得中... (${count} files)`,
@@ -393,7 +395,6 @@
       dropZoneHint: "If dropping a folder does not work, drop files instead.",
       fileInputLabel: "Choose multiple files",
       fileInputBtn: "Choose files",
-      fileInputHint: "Fallback when drag and drop is unavailable.",
       loadStateLabel: "Load state:",
       loadStateNone: "No input",
       loadStateLoading: ({ count }) => `Reading durations... (${count} files)`,
@@ -490,7 +491,6 @@
       dropZoneHint: "dropZoneHint",
       fileInputLabel: "fileInputLabel",
       fileInputBtn: "fileInputBtn",
-      fileInputHint: "fileInputHint",
       loadStateLabel: "loadStateLabel",
       legendSampling: "legendSampling",
       presetLabel: "presetLabel",
@@ -616,6 +616,7 @@
   let lastBuildFallbackLayers = [];
   let fileOrderMode = "default";
   let loadStateInfo = { key: "loadStateNone", vars: {} };
+  let selectedFileIndex = -1;
 
   /** segments: each is {layerIndex, globalStart, globalEnd} */
   let segments = [];
@@ -703,6 +704,7 @@
       const tr = tracks[i];
       const li = document.createElement("li");
       li.className = "file-item";
+      if (i === selectedFileIndex) li.classList.add("selected");
       li.draggable = true;
       li.dataset.index = String(i);
 
@@ -722,6 +724,13 @@
       li.appendChild(meta);
       ul.appendChild(li);
     }
+    updateReorderButtons();
+  }
+
+  function updateReorderButtons() {
+    const hasSelection = selectedFileIndex >= 0 && selectedFileIndex < tracks.length;
+    $("moveUpBtn").disabled = !(hasSelection && selectedFileIndex > 0);
+    $("moveDownBtn").disabled = !(hasSelection && selectedFileIndex < tracks.length - 1);
   }
 
   function renderSegmentList() {
@@ -803,6 +812,7 @@
     totalDuration = 0;
     lastBuildFallbackLayers = [];
     fileOrderMode = "default";
+    selectedFileIndex = -1;
     segments = [];
     playPlan = [];
     segmentDetails = [];
@@ -828,6 +838,7 @@
     totalDuration = 0;
     lastBuildFallbackLayers = [];
     fileOrderMode = orderMode;
+    selectedFileIndex = -1;
     planIndex = -1;
     stopPlaybackUIOnly();
 
@@ -1006,6 +1017,13 @@
     if (fromIndex === toIndex) return;
     const item = tracks.splice(fromIndex, 1)[0];
     tracks.splice(toIndex, 0, item);
+    if (selectedFileIndex === fromIndex) {
+      selectedFileIndex = toIndex;
+    } else if (fromIndex < selectedFileIndex && toIndex >= selectedFileIndex) {
+      selectedFileIndex -= 1;
+    } else if (fromIndex > selectedFileIndex && toIndex <= selectedFileIndex) {
+      selectedFileIndex += 1;
+    }
     recomputeGlobalTimeline();
     resetSegmentsAndLog();
     fileOrderMode = "custom";
@@ -1016,7 +1034,13 @@
   }
 
   function sortTracksByDefault() {
+    const selectedRel = selectedFileIndex >= 0 && selectedFileIndex < tracks.length
+      ? tracks[selectedFileIndex].rel
+      : null;
     tracks.sort((a, b) => a.orderKey.localeCompare(b.orderKey, "en"));
+    if (selectedRel !== null) {
+      selectedFileIndex = tracks.findIndex((t) => t.rel === selectedRel);
+    }
     recomputeGlobalTimeline();
     resetSegmentsAndLog();
     fileOrderMode = "default";
@@ -1492,6 +1516,16 @@
     sortTracksByDefault();
   });
 
+  $("moveUpBtn").addEventListener("click", () => {
+    if (selectedFileIndex <= 0) return;
+    reorderTracks(selectedFileIndex, selectedFileIndex - 1);
+  });
+
+  $("moveDownBtn").addEventListener("click", () => {
+    if (selectedFileIndex < 0 || selectedFileIndex >= tracks.length - 1) return;
+    reorderTracks(selectedFileIndex, selectedFileIndex + 1);
+  });
+
   // Drag & drop input
   const dropZone = $("dropZone");
   dropZone.addEventListener("dragover", (e) => {
@@ -1574,6 +1608,12 @@
   fileList.addEventListener("dragover", (e) => {
     if (dragIndex < 0) return;
     e.preventDefault();
+  });
+  fileList.addEventListener("click", (e) => {
+    const li = e.target.closest(".file-item");
+    if (!li) return;
+    selectedFileIndex = Number(li.dataset.index);
+    renderFileList();
   });
   fileList.addEventListener("drop", (e) => {
     e.preventDefault();

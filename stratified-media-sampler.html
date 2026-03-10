@@ -57,7 +57,35 @@
     .file-list { list-style: none; padding: 0; margin: 6px 0 0; max-height: 220px; overflow: auto; }
     .file-item { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
     .file-item.dragging { opacity: 0.5; }
-    .drag-handle { cursor: grab; user-select: none; color: var(--muted); }
+    .drag-handle {
+      width: 14px;
+      height: 22px;
+      cursor: grab;
+      user-select: none;
+      color: var(--muted);
+      opacity: 0.8;
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .drag-handle::before,
+    .drag-handle::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+    }
+    .drag-handle::before {
+      top: 3px;
+      border-bottom: 6px solid currentColor;
+    }
+    .drag-handle::after {
+      bottom: 3px;
+      border-top: 6px solid currentColor;
+    }
     .file-meta { font-size: 12px; color: var(--muted); }
     .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
     .playback-grid { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
@@ -327,7 +355,6 @@
       logColFile: "ファイル",
       logColLocal: "ファイル内（秒）",
       clearLogBtn: "ログを消去",
-      dragHandle: "[drag]",
       unknown: "unknown",
       noSegments: "区間リストは未生成です。",
       segmentTitle: ({ index, total }) => `区間 ${index} / ${total}`,
@@ -413,7 +440,6 @@
       logColFile: "File",
       logColLocal: "Within file (sec)",
       clearLogBtn: "Clear log",
-      dragHandle: "[drag]",
       unknown: "unknown",
       noSegments: "No segment list has been built yet.",
       segmentTitle: ({ index, total }) => `Segment ${index} / ${total}`,
@@ -682,7 +708,7 @@
 
       const handle = document.createElement("span");
       handle.className = "drag-handle";
-      handle.textContent = t("dragHandle");
+      handle.setAttribute("aria-hidden", "true");
 
       const label = document.createElement("span");
       label.textContent = tr.rel;

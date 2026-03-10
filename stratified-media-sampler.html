@@ -28,7 +28,10 @@
     h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
     .app { padding: 16px; max-width: 1200px; margin: 0 auto; }
     .header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
     .subtle { color: var(--muted); font-size: 12px; }
+    .lang-switch { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+    .lang-switch label { font-size: 12px; color: var(--muted); }
     fieldset { border: 1px solid var(--line); padding: 12px; margin: 10px 0; background: var(--panel); }
     legend { padding: 0 6px; color: var(--muted); }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -67,32 +70,39 @@
 <body>
   <div class="app">
     <div class="header">
-      <h1>Stratified Media Sampler</h1>
-      <div class="subtle">長尺作品の「おおまかな印象」を確実に掴むためのサンプラー</div>
+      <h1 id="appTitle">Stratified Media Sampler</h1>
+      <div class="header-right">
+        <div id="appSubtitle" class="subtle">長尺作品の「おおまかな印象」を確実に掴むためのサンプラー</div>
+        <div class="lang-switch">
+          <span id="langLabel">Language</span>
+          <label><input type="radio" name="lang" value="ja" checked /> 日本語</label>
+          <label><input type="radio" name="lang" value="en" /> English</label>
+        </div>
+      </div>
     </div>
 
   <div class="setup-grid">
     <fieldset>
-      <legend>1) 入力</legend>
+      <legend id="legendInput">1) 入力</legend>
       <div class="row">
         <div class="col" style="flex:1;">
           <div id="dropZone" class="drop-zone">
-            ここにファイルをドラッグ＆ドロップ
-            <div class="small">フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。</div>
+            <div id="dropZoneTitle">ここにファイルをドラッグ＆ドロップ</div>
+            <div id="dropZoneHint" class="small">フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。</div>
           </div>
           <div id="dropMsg" class="small" style="margin-top:6px;"></div>
         </div>
       </div>
       <div class="row" style="margin-top:8px;">
         <div class="col">
-          <label>複数ファイル選択</label>
+          <label id="fileInputLabel">複数ファイル選択</label>
           <input id="fileInput" type="file" multiple accept="audio/*,video/*" />
-          <div class="small">ドラッグ&ドロップが使えない場合の代替手段です。</div>
+          <div id="fileInputHint" class="small">ドラッグ&ドロップが使えない場合の代替手段です。</div>
         </div>
       </div>
 
       <div class="status" style="margin-top:10px;">
-        <div><strong>読み込み状態:</strong> <span id="loadState">未選択</span></div>
+        <div><strong id="loadStateLabel">読み込み状態:</strong> <span id="loadState">未選択</span></div>
         <div class="row" style="margin-top:6px; align-items: center;">
           <div class="small" id="orderState">並び: 既定</div>
           <button id="sortResetBtn" disabled>整列</button>
@@ -105,11 +115,11 @@
     </fieldset>
 
     <fieldset>
-      <legend>2) サンプリング設定</legend>
+      <legend id="legendSampling">2) サンプリング設定</legend>
 
       <div class="row">
         <div class="col">
-          <label>プリセット</label>
+          <label id="presetLabel">プリセット</label>
           <select id="preset">
             <option value="custom">カスタム</option>
             <option value="easy">簡易（20層 × 20秒）</option>
@@ -119,43 +129,43 @@
         </div>
 
         <div class="col">
-          <label>層の数（N）</label>
+          <label id="layersLabel">層の数（N）</label>
           <input id="layers" type="number" min="1" step="1" value="24" />
         </div>
 
         <div class="col">
-          <label>区間長（秒, L）</label>
+          <label id="segLenLabel">区間長（秒, L）</label>
           <input id="segLen" type="number" min="1" step="1" value="30" />
         </div>
       </div>
 
       <div class="row">
         <div class="col">
-          <label>乱数シード（32-bit）</label>
+          <label id="seedLabel">乱数シード（32-bit）</label>
           <div class="row">
             <input id="seed" class="mono" type="text" value="" style="width: 180px;" />
             <button id="regenSeedBtn">自動生成</button>
             <button id="copySeedBtn">コピー</button>
           </div>
-          <div class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
+          <div id="seedHint" class="small">空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。</div>
         </div>
 
         <div class="col">
-          <label>区間の収まり方</label>
+          <label id="singleFileModeLabel">区間の収まり方</label>
           <div class="row">
             <input id="singleFileOnly" type="checkbox" />
-            <label for="singleFileOnly">区間は常に1ファイル内</label>
+            <label id="singleFileOnlyLabel" for="singleFileOnly">区間は常に1ファイル内</label>
           </div>
-          <div class="small">オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。</div>
+          <div id="singleFileHint" class="small">オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。</div>
         </div>
       </div>
 
       <div class="status" style="margin-top:10px;">
         <div class="row">
-          <div><span class="pill">総尺</span> <span id="totalDur">-</span></div>
-          <div><span class="pill">平均チェック間隔</span> <span id="avgGap">-</span></div>
-          <div><span class="pill">総聴取時間</span> <span id="totalListen">-</span></div>
-          <div><span class="pill">時間比</span> <span id="coverage">-</span></div>
+          <div><span id="totalDurLabel" class="pill">総尺</span> <span id="totalDur">-</span></div>
+          <div><span id="avgGapLabel" class="pill">平均チェック間隔</span> <span id="avgGap">-</span></div>
+          <div><span id="totalListenLabel" class="pill">総聴取時間</span> <span id="totalListen">-</span></div>
+          <div><span id="coverageLabel" class="pill">時間比</span> <span id="coverage">-</span></div>
         </div>
         <div id="warnings" class="small"></div>
       </div>
@@ -167,15 +177,15 @@
   </div>
 
   <fieldset>
-    <legend>3) 再生</legend>
+    <legend id="legendPlayback">3) 再生</legend>
     <div class="playback-grid">
       <div>
-        <h2>区間リスト</h2>
+        <h2 id="segmentListHeading">区間リスト</h2>
         <ul class="segment-list" id="segmentList"></ul>
-        <div class="segment-note">区間リストをShift+クリックでその区間から再生</div>
+        <div id="segmentNote" class="segment-note">区間リストをShift+クリックでその区間から再生</div>
       </div>
       <div>
-        <h2>再生</h2>
+        <h2 id="playerHeading">再生</h2>
         <video id="player" controls style="width:100%;"></video>
         <div class="row" style="margin-top:10px;">
           <button id="startBtn" disabled>再生開始</button>
@@ -185,7 +195,7 @@
           <button id="stopBtn" disabled>停止</button>
         </div>
         <div class="status" style="margin-top:10px;">
-          <div><strong>現在:</strong> <span id="nowPlaying">-</span></div>
+          <div><strong id="nowLabel">現在:</strong> <span id="nowPlaying">-</span></div>
           <div class="small mono" id="nowDetail">-</div>
         </div>
       </div>
@@ -193,18 +203,18 @@
   </fieldset>
 
   <fieldset>
-    <legend>4) ログ</legend>
+    <legend id="legendLog">4) ログ</legend>
     <div class="row" style="margin-bottom:8px;">
-      <div class="small">「どのファイルのどの区間を再生したか」を追記します。</div>
+      <div id="logHint" class="small">「どのファイルのどの区間を再生したか」を追記します。</div>
       <button id="exportLogBtn" disabled>ログ(JSON)をコピー</button>
     </div>
     <table>
       <thead>
         <tr>
           <th>#</th>
-          <th>全体タイムライン（秒）</th>
-          <th>ファイル</th>
-          <th>ファイル内（秒）</th>
+          <th id="logColGlobal">全体タイムライン（秒）</th>
+          <th id="logColFile">ファイル</th>
+          <th id="logColLocal">ファイル内（秒）</th>
         </tr>
       </thead>
       <tbody id="logBody"></tbody>
@@ -219,6 +229,259 @@
 (() => {
   // ---------- Utilities ----------
   const $ = (id) => document.getElementById(id);
+  const messages = {
+    ja: {
+      htmlLang: "ja",
+      pageTitle: "Stratified Media Sampler (Experimental)",
+      appTitle: "Stratified Media Sampler",
+      appSubtitle: "長尺作品の「おおまかな印象」を確実に掴むためのサンプラー",
+      langLabel: "Language",
+      legendInput: "1) 入力",
+      dropZoneTitle: "ここにファイルをドラッグ＆ドロップ",
+      dropZoneHint: "フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。",
+      fileInputLabel: "複数ファイル選択",
+      fileInputHint: "ドラッグ&ドロップが使えない場合の代替手段です。",
+      loadStateLabel: "読み込み状態:",
+      loadStateNone: "未選択",
+      loadStateLoading: ({ count }) => `duration取得中... (${count} files)`,
+      loadStateLoaded: ({ count, total }) => `読み込み完了: ${count}件, 合計 ${total.toFixed(3)}s`,
+      loadStateBuilt: ({ count, total, segments }) => `${count}件, 合計 ${total.toFixed(3)}s / 区間 ${segments}件を生成`,
+      orderDefault: "並び: 既定",
+      orderCustom: "並び: カスタム",
+      sortResetBtn: "整列",
+      clearBtn: "クリア",
+      legendSampling: "2) サンプリング設定",
+      presetLabel: "プリセット",
+      presetCustom: "カスタム",
+      presetEasy: "簡易（20層 × 20秒）",
+      presetStandard: "標準（24層 × 30秒）",
+      presetStrict: "厳格（40層 × 30秒）",
+      layersLabel: "層の数（N）",
+      segLenLabel: "区間長（秒, L）",
+      seedLabel: "乱数シード（32-bit）",
+      regenSeedBtn: "自動生成",
+      copySeedBtn: "コピー",
+      seedHint: "空なら自動生成します。再現性は「ファイル順 + 設定 + seed」が揃って成立。",
+      singleFileModeLabel: "区間の収まり方",
+      singleFileOnlyLabel: "区間は常に1ファイル内",
+      singleFileHint: "オンの場合、各層の区間は必ず単一ファイル内に収めます（該当範囲がない層は例外）。",
+      totalDurLabel: "総尺",
+      avgGapLabel: "平均チェック間隔",
+      totalListenLabel: "総聴取時間",
+      coverageLabel: "時間比",
+      buildBtn: "区間リスト生成",
+      legendPlayback: "3) 再生",
+      segmentListHeading: "区間リスト",
+      segmentNote: "区間リストをShift+クリックでその区間から再生",
+      playerHeading: "再生",
+      startBtn: "再生開始",
+      pauseBtn: "一時停止/再開",
+      prevBtn: "前へ",
+      nextBtn: "次へ",
+      stopBtn: "停止",
+      nowLabel: "現在:",
+      legendLog: "4) ログ",
+      logHint: "「どのファイルのどの区間を再生したか」を追記します。",
+      exportLogBtn: "ログ(JSON)をコピー",
+      logColGlobal: "全体タイムライン（秒）",
+      logColFile: "ファイル",
+      logColLocal: "ファイル内（秒）",
+      clearLogBtn: "ログを消去",
+      dragHandle: "[drag]",
+      unknown: "unknown",
+      noSegments: "区間リストは未生成です。",
+      segmentTitle: ({ index, total }) => `区間 ${index} / ${total}`,
+      segmentRange: ({ start, end, duration }) => `${fmtTime(start)} → ${fmtTime(end)} (${duration.toFixed(3)}s)`,
+      filesSummaryMore: ({ first, second, extra }) => `${first} → ${second} (ほか${extra})`,
+      missingTrackMapping: "開始位置がどのファイルにもマップできません。",
+      audioLoadError: "メディア読み込みエラー",
+      nowPlaying: ({ index, total, partLabel, fileLabel }) => `区間 ${index}/${total}${partLabel}: ${fileLabel}`,
+      nowDetail: ({ segStart, segEnd, globalNow, local, duration }) => `global ${fmtTime(segStart)} → ${fmtTime(segEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(duration)})`,
+      segmentPartLabel: ({ partIndex, partCount }) => ` / part ${partIndex}/${partCount}`,
+      logPartSuffix: ({ partIndex, partCount }) => `  (part ${partIndex}/${partCount})`,
+      avgGap: ({ gap }) => `${fmtTime(gap)}（≈ ${(gap / 60).toFixed(1)} min/層）`,
+      totalListen: ({ listen }) => `${fmtTime(listen)}（${listen.toFixed(0)}s）`,
+      warningNoMediaLoaded: `<span class="warn">メディアファイルが読み込まれていません。</span>`,
+      warningSegmentExceedsLayer: ({ L, layerWidth }) => `<span class="warn">区間長 L=${L}s が層幅 S=${layerWidth.toFixed(3)}s を超えています。層内に収まらないため、層境界を跨ぐ区間が発生します（層化の意味が弱まります）。</span>`,
+      warningShortestShorter: ({ shortest, L }) => `<span class="warn">最短ファイル長が区間長より短いです（${shortest.toFixed(3)}s < ${L}s）。ファイル境界跨ぎが頻発します。</span>`,
+      warningSingleFileFallback: ({ list }) => `<span class="warn">「区間は常に1ファイル内」設定に合致する範囲がない層があります（層: ${list}）。これらは例外的に既定挙動で生成しました。</span>`,
+      warningsOk: `<span class="small">OK</span>`,
+      dropMsgNoMedia: "メディアファイルが見つかりませんでした。",
+      dropMsgDropFiles: "ファイルをドラッグアンドドロップしてください。",
+      errNoDuration: "総尺が取得できていません。",
+      errInvalidLayers: "層数が不正です。",
+      errInvalidSegLen: "区間長が不正です。",
+      errDurationUnavailable: ({ name }) => `duration unavailable: ${name}`,
+      errCannotLoad: ({ name }) => `cannot load: ${name}`,
+      exportGeneratedAt: "generatedAt"
+    },
+    en: {
+      htmlLang: "en",
+      pageTitle: "Stratified Media Sampler (Experimental)",
+      appTitle: "Stratified Media Sampler",
+      appSubtitle: "A sampler for capturing the rough impression of long-form works with reliable coverage",
+      langLabel: "Language",
+      legendInput: "1) Input",
+      dropZoneTitle: "Drag and drop files here",
+      dropZoneHint: "If dropping a folder does not work, drop files instead.",
+      fileInputLabel: "Choose multiple files",
+      fileInputHint: "Fallback when drag and drop is unavailable.",
+      loadStateLabel: "Load state:",
+      loadStateNone: "No input",
+      loadStateLoading: ({ count }) => `Reading durations... (${count} files)`,
+      loadStateLoaded: ({ count, total }) => `Loaded: ${count} files, total ${total.toFixed(3)}s`,
+      loadStateBuilt: ({ count, total, segments }) => `${count} files, total ${total.toFixed(3)}s / built ${segments} segments`,
+      orderDefault: "Order: default",
+      orderCustom: "Order: custom",
+      sortResetBtn: "Reset order",
+      clearBtn: "Clear",
+      legendSampling: "2) Sampling Settings",
+      presetLabel: "Preset",
+      presetCustom: "Custom",
+      presetEasy: "Easy (20 layers x 20 sec)",
+      presetStandard: "Standard (24 layers x 30 sec)",
+      presetStrict: "Strict (40 layers x 30 sec)",
+      layersLabel: "Number of layers (N)",
+      segLenLabel: "Segment length (sec, L)",
+      seedLabel: "Random seed (32-bit)",
+      regenSeedBtn: "Generate",
+      copySeedBtn: "Copy",
+      seedHint: "If empty, a seed is generated automatically. Reproducibility depends on file order + settings + seed.",
+      singleFileModeLabel: "Segment placement",
+      singleFileOnlyLabel: "Keep each segment within one file",
+      singleFileHint: "When enabled, each layer is constrained to a single file where possible. Layers without a valid range fall back.",
+      totalDurLabel: "Total duration",
+      avgGapLabel: "Average gap",
+      totalListenLabel: "Total listening time",
+      coverageLabel: "Coverage",
+      buildBtn: "Build segment list",
+      legendPlayback: "3) Playback",
+      segmentListHeading: "Segment List",
+      segmentNote: "Shift-click a segment to start playback there",
+      playerHeading: "Player",
+      startBtn: "Start",
+      pauseBtn: "Pause/Resume",
+      prevBtn: "Previous",
+      nextBtn: "Next",
+      stopBtn: "Stop",
+      nowLabel: "Now:",
+      legendLog: "4) Log",
+      logHint: "Append which file ranges were actually played.",
+      exportLogBtn: "Copy log (JSON)",
+      logColGlobal: "Global timeline (sec)",
+      logColFile: "File",
+      logColLocal: "Within file (sec)",
+      clearLogBtn: "Clear log",
+      dragHandle: "[drag]",
+      unknown: "unknown",
+      noSegments: "No segment list has been built yet.",
+      segmentTitle: ({ index, total }) => `Segment ${index} / ${total}`,
+      segmentRange: ({ start, end, duration }) => `${fmtTime(start)} → ${fmtTime(end)} (${duration.toFixed(3)}s)`,
+      filesSummaryMore: ({ first, second, extra }) => `${first} → ${second} (+${extra})`,
+      missingTrackMapping: "The start position could not be mapped to any file.",
+      audioLoadError: "Audio load error",
+      nowPlaying: ({ index, total, partLabel, fileLabel }) => `Segment ${index}/${total}${partLabel}: ${fileLabel}`,
+      nowDetail: ({ segStart, segEnd, globalNow, local, duration }) => `global ${fmtTime(segStart)} → ${fmtTime(segEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(duration)})`,
+      segmentPartLabel: ({ partIndex, partCount }) => ` / part ${partIndex}/${partCount}`,
+      logPartSuffix: ({ partIndex, partCount }) => `  (part ${partIndex}/${partCount})`,
+      avgGap: ({ gap }) => `${fmtTime(gap)} (about ${(gap / 60).toFixed(1)} min/layer)`,
+      totalListen: ({ listen }) => `${fmtTime(listen)} (${listen.toFixed(0)}s)`,
+      warningNoMediaLoaded: `<span class="warn">No media files have been loaded.</span>`,
+      warningSegmentExceedsLayer: ({ L, layerWidth }) => `<span class="warn">Segment length L=${L}s exceeds layer width S=${layerWidth.toFixed(3)}s. Segments will cross layer boundaries, which weakens the stratification.</span>`,
+      warningShortestShorter: ({ shortest, L }) => `<span class="warn">The shortest file is shorter than the segment length (${shortest.toFixed(3)}s < ${L}s). File-boundary crossings will be frequent.</span>`,
+      warningSingleFileFallback: ({ list }) => `<span class="warn">Some layers have no valid range for the \"single-file only\" setting (layers: ${list}). Those layers were generated with the default fallback.</span>`,
+      warningsOk: `<span class="small">OK</span>`,
+      dropMsgNoMedia: "No media files were found.",
+      dropMsgDropFiles: "Please drag and drop files.",
+      errNoDuration: "Total duration is not available.",
+      errInvalidLayers: "Invalid layer count.",
+      errInvalidSegLen: "Invalid segment length.",
+      errDurationUnavailable: ({ name }) => `duration unavailable: ${name}`,
+      errCannotLoad: ({ name }) => `cannot load: ${name}`,
+      exportGeneratedAt: "generatedAt"
+    }
+  };
+  let currentLang = "ja";
+
+  function t(key, vars = {}) {
+    const entry = messages[currentLang][key];
+    if (typeof entry === "function") return entry(vars);
+    if (entry !== undefined) return entry;
+    return key;
+  }
+
+  function applyLanguage(lang) {
+    currentLang = messages[lang] ? lang : "ja";
+    document.documentElement.lang = messages[currentLang].htmlLang;
+    document.title = t("pageTitle");
+    const textMap = {
+      appTitle: "appTitle",
+      appSubtitle: "appSubtitle",
+      langLabel: "langLabel",
+      legendInput: "legendInput",
+      dropZoneTitle: "dropZoneTitle",
+      dropZoneHint: "dropZoneHint",
+      fileInputLabel: "fileInputLabel",
+      fileInputHint: "fileInputHint",
+      loadStateLabel: "loadStateLabel",
+      legendSampling: "legendSampling",
+      presetLabel: "presetLabel",
+      layersLabel: "layersLabel",
+      segLenLabel: "segLenLabel",
+      seedLabel: "seedLabel",
+      regenSeedBtn: "regenSeedBtn",
+      copySeedBtn: "copySeedBtn",
+      seedHint: "seedHint",
+      singleFileModeLabel: "singleFileModeLabel",
+      singleFileOnlyLabel: "singleFileOnlyLabel",
+      singleFileHint: "singleFileHint",
+      totalDurLabel: "totalDurLabel",
+      avgGapLabel: "avgGapLabel",
+      totalListenLabel: "totalListenLabel",
+      coverageLabel: "coverageLabel",
+      buildBtn: "buildBtn",
+      legendPlayback: "legendPlayback",
+      segmentListHeading: "segmentListHeading",
+      segmentNote: "segmentNote",
+      playerHeading: "playerHeading",
+      startBtn: "startBtn",
+      pauseBtn: "pauseBtn",
+      prevBtn: "prevBtn",
+      nextBtn: "nextBtn",
+      stopBtn: "stopBtn",
+      nowLabel: "nowLabel",
+      legendLog: "legendLog",
+      logHint: "logHint",
+      exportLogBtn: "exportLogBtn",
+      logColGlobal: "logColGlobal",
+      logColFile: "logColFile",
+      logColLocal: "logColLocal",
+      clearLogBtn: "clearLogBtn",
+      sortResetBtn: "sortResetBtn",
+      clearBtn: "clearBtn"
+    };
+    for (const [id, key] of Object.entries(textMap)) {
+      const el = $(id);
+      if (el) el.textContent = t(key);
+    }
+    const preset = $("preset");
+    preset.options[0].textContent = t("presetCustom");
+    preset.options[1].textContent = t("presetEasy");
+    preset.options[2].textContent = t("presetStandard");
+    preset.options[3].textContent = t("presetStrict");
+    setLoadState(loadStateInfo.key, loadStateInfo.vars);
+    updateOrderState();
+    updateStats();
+    renderFileList();
+    renderSegmentList();
+    renderWarnings();
+    if (!isPlaying) {
+      $("nowPlaying").textContent = "-";
+      $("nowDetail").textContent = "-";
+    } else {
+      updateNowUI();
+    }
+  }
 
   function fmtTime(sec) {
     if (!isFinite(sec)) return "-";
@@ -284,6 +547,7 @@
   let totalDuration = 0;
   let lastBuildFallbackLayers = [];
   let fileOrderMode = "default";
+  let loadStateInfo = { key: "loadStateNone", vars: {} };
 
   /** segments: each is {layerIndex, globalStart, globalEnd} */
   let segments = [];
@@ -324,13 +588,13 @@
       a.addEventListener("loadedmetadata", () => {
         const d = a.duration;
         cleanup();
-        if (!isFinite(d) || d <= 0) reject(new Error(`duration unavailable: ${file.name}`));
+        if (!isFinite(d) || d <= 0) reject(new Error(t("errDurationUnavailable", { name: file.name })));
         else resolve(d);
       }, { once: true });
 
       a.addEventListener("error", () => {
         cleanup();
-        reject(new Error(`cannot load: ${file.name}`));
+        reject(new Error(t("errCannotLoad", { name: file.name })));
       }, { once: true });
     });
   }
@@ -355,8 +619,13 @@
   }
 
   function updateOrderState() {
-    $("orderState").textContent = fileOrderMode === "custom" ? "並び: カスタム" : "並び: 既定";
+    $("orderState").textContent = fileOrderMode === "custom" ? t("orderCustom") : t("orderDefault");
     $("sortResetBtn").disabled = fileOrderMode !== "custom";
+  }
+
+  function setLoadState(key, vars = {}) {
+    loadStateInfo = { key, vars };
+    $("loadState").textContent = t(key, vars);
   }
 
   function renderFileList() {
@@ -371,7 +640,7 @@
 
       const handle = document.createElement("span");
       handle.className = "drag-handle";
-      handle.textContent = "[drag]";
+      handle.textContent = t("dragHandle");
 
       const label = document.createElement("span");
       label.textContent = tr.rel;
@@ -393,7 +662,7 @@
     if (segmentDetails.length === 0) {
       const empty = document.createElement("li");
       empty.className = "segment-item";
-      empty.textContent = "区間リストは未生成です。";
+      empty.textContent = t("noSegments");
       ul.appendChild(empty);
       return;
     }
@@ -405,11 +674,11 @@
 
       const title = document.createElement("div");
       title.className = "segment-title";
-      title.textContent = `区間 ${i + 1} / ${segmentDetails.length}`;
+      title.textContent = t("segmentTitle", { index: i + 1, total: segmentDetails.length });
 
       const range = document.createElement("div");
       range.className = "segment-sub";
-      range.textContent = `${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)} (${(seg.globalEnd - seg.globalStart).toFixed(3)}s)`;
+      range.textContent = t("segmentRange", { start: seg.globalStart, end: seg.globalEnd, duration: seg.globalEnd - seg.globalStart });
 
       const files = document.createElement("div");
       files.className = "segment-sub";
@@ -473,16 +742,16 @@
     stopPlaybackUIOnly();
 
     if (!entries || entries.length === 0) {
-    $("loadState").textContent = "未選択";
-    renderFileList();
-    renderSegmentList();
-    updateStats();
-    updateButtons();
-    updateOrderState();
-    return;
+      setLoadState("loadStateNone");
+      renderFileList();
+      renderSegmentList();
+      updateStats();
+      updateButtons();
+      updateOrderState();
+      return;
     }
 
-    $("loadState").textContent = `duration取得中... (${entries.length} files)`;
+    setLoadState("loadStateLoading", { count: entries.length });
 
     let cursor = 0;
 
@@ -513,9 +782,9 @@
 
     totalDuration = cursor;
 
-    $("loadState").textContent = `読み込み完了: ${tracks.length} files, total ${totalDuration.toFixed(3)}s`;
+    setLoadState("loadStateLoaded", { count: tracks.length, total: totalDuration });
     if (tracks.length === 0) {
-      setDropMsg("メディアファイルが見つかりませんでした。");
+      setDropMsg(t("dropMsgNoMedia"));
     }
     renderFileList();
     updateStats();
@@ -681,9 +950,9 @@
     }
     rng = mulberry32(rngSeed);
 
-    if (!Number.isFinite(totalDuration) || totalDuration <= 0) throw new Error("総尺が取得できていません。");
-    if (!Number.isFinite(N) || N < 1) throw new Error("層数が不正です。");
-    if (!Number.isFinite(L) || L < 1) throw new Error("区間長が不正です。");
+    if (!Number.isFinite(totalDuration) || totalDuration <= 0) throw new Error(t("errNoDuration"));
+    if (!Number.isFinite(N) || N < 1) throw new Error(t("errInvalidLayers"));
+    if (!Number.isFinite(L) || L < 1) throw new Error(t("errInvalidSegLen"));
 
     const layerWidth = totalDuration / N;
     segments = [];
@@ -796,14 +1065,14 @@
     // Build segment details for display
     segmentDetails = segments.map((seg, i) => {
       const parts = playPlan.filter(p => p.segIndex === i);
-      const names = parts.map(p => tracks[p.trackIndex]?.rel || "unknown");
+      const names = parts.map(p => tracks[p.trackIndex]?.rel || t("unknown"));
       const unique = [];
       for (const n of names) {
         if (!unique.includes(n)) unique.push(n);
       }
       const filesSummary = unique.length <= 2
         ? unique.join(" → ")
-        : `${unique[0]} → ${unique[1]} (+${unique.length - 2})`;
+        : t("filesSummaryMore", { first: unique[0], second: unique[1], extra: unique.length - 2 });
       return {
         globalStart: seg.globalStart,
         globalEnd: seg.globalEnd,
@@ -867,7 +1136,7 @@
     const item = playPlan[planIndex];
 
     const ti = item.trackIndex;
-    if (ti < 0 || ti >= tracks.length) throw new Error("開始位置がどのファイルにもマップできません。");
+    if (ti < 0 || ti >= tracks.length) throw new Error(t("missingTrackMapping"));
 
     currentTrackIndex = ti;
 
@@ -877,7 +1146,7 @@
     // wait until loaded enough to seek and play
     await new Promise((resolve, reject) => {
       const onReady = () => { cleanup(); resolve(); };
-      const onErr = () => { cleanup(); reject(new Error("audio load error")); };
+      const onErr = () => { cleanup(); reject(new Error(t("audioLoadError"))); };
       const cleanup = () => {
         player.removeEventListener("loadedmetadata", onReady);
         player.removeEventListener("error", onErr);
@@ -921,10 +1190,10 @@
     const globalNow = tr.startGlobal + local;
 
     const fileLabel = tr.rel;
-    const partLabel = item.partCount > 1 ? ` / part ${item.partIndex}/${item.partCount}` : "";
-    $("nowPlaying").textContent = `区間 ${item.segIndex + 1}/${segments.length}${partLabel}: ${fileLabel}`;
+    const partLabel = item.partCount > 1 ? t("segmentPartLabel", { partIndex: item.partIndex, partCount: item.partCount }) : "";
+    $("nowPlaying").textContent = t("nowPlaying", { index: item.segIndex + 1, total: segments.length, partLabel, fileLabel });
     $("nowDetail").textContent =
-      `global ${fmtTime(seg.globalStart)} → ${fmtTime(seg.globalEnd)}  /  now ${fmtTime(globalNow)}  |  file ${fmtTime(local)} (dur ${fmtTime(tr.duration)})`;
+      t("nowDetail", { segStart: seg.globalStart, segEnd: seg.globalEnd, globalNow, local, duration: tr.duration });
     highlightSegment(item.segIndex);
   }
 
@@ -937,7 +1206,7 @@
     const local1 = item.localEnd;
 
     const tr = document.createElement("tr");
-    const partSuffix = item.partCount > 1 ? `  (part ${item.partIndex}/${item.partCount})` : "";
+    const partSuffix = item.partCount > 1 ? t("logPartSuffix", { partIndex: item.partIndex, partCount: item.partCount }) : "";
     const cells = [
       String(item.segIndex + 1),
       `${fmtTime(g0)} → ${fmtTime(g1)} (${(g1-g0).toFixed(3)}s)`,
@@ -1045,14 +1314,14 @@
 
     if (totalDuration > 0 && Number.isFinite(N) && N > 0) {
       const gap = totalDuration / N;
-      $("avgGap").textContent = `${fmtTime(gap)}（≈ ${ (gap/60).toFixed(1) } min/層）`;
+      $("avgGap").textContent = t("avgGap", { gap });
     } else {
       $("avgGap").textContent = "-";
     }
 
     if (Number.isFinite(N) && Number.isFinite(L) && N > 0 && L > 0) {
       const listen = N * L;
-      $("totalListen").textContent = `${fmtTime(listen)}（${listen.toFixed(0)}s）`;
+      $("totalListen").textContent = t("totalListen", { listen });
       if (totalDuration > 0) {
         const cov = (listen / totalDuration) * 100;
         $("coverage").textContent = `${cov.toFixed(2)}%`;
@@ -1073,23 +1342,23 @@
     const L = Number($("segLen").value);
     const singleFileOnly = $("singleFileOnly").checked;
 
-    if (tracks.length === 0) msgs.push(`<span class="warn">メディアファイルが読み込まれていません。</span>`);
+    if (tracks.length === 0) msgs.push(t("warningNoMediaLoaded"));
     if (totalDuration > 0 && Number.isFinite(N) && N > 0 && Number.isFinite(L) && L > 0) {
       const layerWidth = totalDuration / N;
       if (L > layerWidth) {
-        msgs.push(`<span class="warn">区間長 L=${L}s が層幅 S=${layerWidth.toFixed(3)}s を超えています。層内に収まらないため、層境界を跨ぐ区間が発生します（層化の意味が弱まります）。</span>`);
+        msgs.push(t("warningSegmentExceedsLayer", { L, layerWidth }));
       }
       // Heuristic: warn if any track shorter than L (may cause frequent boundary crossing)
       const shortest = tracks.reduce((m, t) => Math.min(m, t.duration), Infinity);
       if (isFinite(shortest) && shortest < L) {
-        msgs.push(`<span class="warn">最短ファイル長が区間長より短いです（${shortest.toFixed(3)}s < ${L}s）。ファイル境界跨ぎが頻発します。</span>`);
+        msgs.push(t("warningShortestShorter", { shortest, L }));
       }
     }
     if (singleFileOnly && lastBuildFallbackLayers.length > 0) {
       const list = lastBuildFallbackLayers.join(", ");
-      msgs.push(`<span class="warn">「区間は常に1ファイル内」設定に合致する範囲がない層があります（層: ${list}）。これらは例外的に既定挙動で生成しました。</span>`);
+      msgs.push(t("warningSingleFileFallback", { list }));
     }
-    $("warnings").innerHTML = msgs.join("<br>") || `<span class="small">OK</span>`;
+    $("warnings").innerHTML = msgs.join("<br>") || t("warningsOk");
   }
 
   function updateButtons() {
@@ -1187,7 +1456,7 @@
       return;
     }
 
-    setDropMsg("ファイルをドラッグアンドドロップしてください。");
+    setDropMsg(t("dropMsgDropFiles"));
   });
 
   // Reorder list (drag & drop)
@@ -1267,7 +1536,7 @@
   $("buildBtn").addEventListener("click", () => {
     try {
       buildSegments();
-      $("loadState").textContent = `${tracks.length} files, total ${totalDuration.toFixed(3)}s / segments built: ${segments.length}`;
+      setLoadState("loadStateBuilt", { count: tracks.length, total: totalDuration, segments: segments.length });
       updateButtons();
     } catch (e) {
       alert(e.message || String(e));
@@ -1336,10 +1605,20 @@
     $("exportLogBtn").disabled = true;
   });
 
+  document.querySelectorAll('input[name="lang"]').forEach((input) => {
+    input.addEventListener("change", (e) => {
+      applyLanguage(e.target.value);
+    });
+  });
+
   // Init seed
+  currentLang = (navigator.language || "").toLowerCase().startsWith("ja") ? "ja" : "en";
+  const initialLangInput = document.querySelector(`input[name="lang"][value="${currentLang}"]`);
+  if (initialLangInput) initialLangInput.checked = true;
   rngSeed = autoSeed();
   $("seed").value = String(rngSeed);
 
+  applyLanguage(currentLang);
   updateStats();
   updateButtons();
   updateOrderState();

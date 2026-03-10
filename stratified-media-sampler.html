@@ -33,6 +33,7 @@
     .lang-switch { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
     .lang-switch label { font-size: 12px; color: var(--muted); }
     fieldset { border: 1px solid var(--line); padding: 12px; margin: 10px 0; background: var(--panel); }
+    .panel-stack { display: grid; grid-template-rows: auto auto auto 1fr auto; }
     legend { padding: 0 6px; color: var(--muted); }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .col { display: flex; flex-direction: column; gap: 6px; }
@@ -41,6 +42,7 @@
     button { padding: 8px 10px; font-size: 14px; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .full-width { width: 100%; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     .status { padding: 8px; background: #f9f7f2; border: 1px solid var(--line); }
     .warn { color: var(--warn); }
@@ -57,7 +59,7 @@
     .file-item.dragging { opacity: 0.5; }
     .drag-handle { cursor: grab; user-select: none; color: var(--muted); }
     .file-meta { font-size: 12px; color: var(--muted); }
-    .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
     .playback-grid { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
     .segment-list { list-style: none; padding: 0; margin: 0; min-height: 320px; max-height: 60vh; overflow: auto; }
     .segment-item { padding: 8px; border: 1px solid var(--line); margin-bottom: 6px; background: #fff; }
@@ -76,6 +78,31 @@
       white-space: nowrap;
       border: 0;
     }
+    @media (max-width: 980px) {
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .header-right {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .setup-grid,
+      .playback-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 720px) {
+      .app {
+        padding: 12px;
+      }
+      .segment-list {
+        min-height: 220px;
+        max-height: 40vh;
+      }
+    }
   </style>
 </head>
 <body>
@@ -93,7 +120,7 @@
     </div>
 
   <div class="setup-grid">
-    <fieldset>
+    <fieldset class="panel-stack">
       <legend id="legendInput">1) 入力</legend>
       <div class="row">
         <div class="col" style="flex:1;">
@@ -121,7 +148,7 @@
         </div>
         <ul class="file-list" id="fileList"></ul>
       </div>
-      <div class="row" style="margin-top:8px; justify-content: flex-end;">
+      <div class="row" style="margin-top:8px; justify-content: flex-start; align-self: end;">
         <button id="clearBtn">クリア</button>
       </div>
     </fieldset>
@@ -183,7 +210,7 @@
       </div>
 
       <div class="row" style="margin-top:10px;">
-        <button id="buildBtn" class="primary" disabled>区間リスト生成</button>
+        <button id="buildBtn" class="primary full-width" disabled>区間リスト生成</button>
       </div>
     </fieldset>
   </div>

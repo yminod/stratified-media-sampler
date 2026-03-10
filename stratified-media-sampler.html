@@ -150,9 +150,7 @@
     <div class="header">
       <h1 id="appTitle">Stratified Media Sampler</h1>
       <div class="header-right">
-        <div id="appSubtitle" class="subtle">長尺作品の「おおまかな印象」を確実に掴むためのサンプラー</div>
         <div class="lang-switch">
-          <span id="langLabel">Language</span>
           <label><input type="radio" name="lang" value="ja" checked /> 日本語</label>
           <label><input type="radio" name="lang" value="en" /> English</label>
         </div>
@@ -207,7 +205,9 @@
             <option value="strict">厳格（40層 × 30秒）</option>
           </select>
         </div>
+      </div>
 
+      <div class="row">
         <div class="col">
           <label id="layersLabel">層の数（N）</label>
           <input id="layers" type="number" min="1" step="1" value="24" />
@@ -314,9 +314,7 @@
       htmlLang: "ja",
       pageTitle: "Stratified Media Sampler (Experimental)",
       appTitle: "Stratified Media Sampler",
-      appSubtitle: "長尺作品の「おおまかな印象」を確実に掴むためのサンプラー",
-      langLabel: "Language",
-      legendInput: "STEP 1 Input",
+      legendInput: "STEP 1 入力",
       dropZoneTitle: "ここにファイルをドラッグ＆ドロップ",
       dropZoneHint: "フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。",
       fileInputLabel: "複数ファイル選択",
@@ -330,14 +328,14 @@
       orderCustom: "並び: カスタム",
       sortResetBtn: "整列",
       clearBtn: "クリア",
-      legendSampling: "STEP 2 Sampling",
+      legendSampling: "STEP 2 サンプリング設定",
       presetLabel: "プリセット",
       presetCustom: "カスタム",
       presetEasy: "簡易（20層 × 20秒）",
       presetStandard: "標準（24層 × 30秒）",
       presetStrict: "厳格（40層 × 30秒）",
-      layersLabel: "層の数（N）",
-      segLenLabel: "区間長（秒, L）",
+      layersLabel: "層の数",
+      segLenLabel: "区間長（秒）",
       seedLabel: "乱数シード（32-bit）",
       regenSeedBtn: "自動生成",
       copySeedBtn: "コピー",
@@ -350,7 +348,7 @@
       totalListenLabel: "総聴取時間",
       coverageLabel: "時間比",
       buildBtn: "区間リスト生成",
-      legendPlayback: "STEP 3 Playback",
+      legendPlayback: "STEP 3 再生",
       segmentListHeading: "区間リスト",
       segmentNote: "区間リストをShift+クリックでその区間から再生",
       playerHeading: "再生",
@@ -360,7 +358,7 @@
       nextBtn: "次へ",
       stopBtn: "停止",
       nowLabel: "現在:",
-      legendLog: "Log",
+      legendLog: "ログ",
       logHint: "「どのファイルのどの区間を再生したか」を追記します。",
       exportLogBtn: "ログ(JSON)をコピー",
       logColGlobal: "全体タイムライン（秒）",
@@ -398,8 +396,6 @@
       htmlLang: "en",
       pageTitle: "Stratified Media Sampler (Experimental)",
       appTitle: "Stratified Media Sampler",
-      appSubtitle: "A sampler for capturing the rough impression of long-form works with reliable coverage",
-      langLabel: "Language",
       legendInput: "STEP 1 Input",
       dropZoneTitle: "Drag and drop files here",
       dropZoneHint: "If dropping a folder does not work, drop files instead.",
@@ -420,8 +416,8 @@
       presetEasy: "Easy (20 layers x 20 sec)",
       presetStandard: "Standard (24 layers x 30 sec)",
       presetStrict: "Strict (40 layers x 30 sec)",
-      layersLabel: "Number of layers (N)",
-      segLenLabel: "Segment length (sec, L)",
+      layersLabel: "Number of layers",
+      segLenLabel: "Segment length (sec)",
       seedLabel: "Random seed (32-bit)",
       regenSeedBtn: "Generate",
       copySeedBtn: "Copy",
@@ -494,8 +490,6 @@
     document.title = t("pageTitle");
     const textMap = {
       appTitle: "appTitle",
-      appSubtitle: "appSubtitle",
-      langLabel: "langLabel",
       legendInput: "legendInput",
       dropZoneTitle: "dropZoneTitle",
       dropZoneHint: "dropZoneHint",
@@ -700,6 +694,12 @@
   function updateOrderState() {
     $("orderState").textContent = fileOrderMode === "custom" ? t("orderCustom") : t("orderDefault");
     $("sortResetBtn").disabled = fileOrderMode !== "custom";
+  }
+
+  function updatePresetControls() {
+    const isCustom = $("preset").value === "custom";
+    $("layers").disabled = !isCustom;
+    $("segLen").disabled = !isCustom;
   }
 
   function setLoadState(key, vars = {}) {
@@ -1659,6 +1659,7 @@
     if (p === "easy") { $("layers").value = 20; $("segLen").value = 20; }
     else if (p === "standard") { $("layers").value = 24; $("segLen").value = 30; }
     else if (p === "strict") { $("layers").value = 40; $("segLen").value = 30; }
+    updatePresetControls();
     updateStats();
   });
 
@@ -1762,6 +1763,7 @@
   $("seed").value = String(rngSeed);
 
   applyLanguage(currentLang);
+  updatePresetControls();
   updateStats();
   updateButtons();
   updateOrderState();

@@ -745,6 +745,28 @@
     updateButtons();
   }
 
+  function clearInputState() {
+    tracks = [];
+    totalDuration = 0;
+    lastBuildFallbackLayers = [];
+    fileOrderMode = "default";
+    segments = [];
+    playPlan = [];
+    segmentDetails = [];
+    planIndex = -1;
+    currentTrackIndex = -1;
+    isPlaying = false;
+    isPaused = false;
+    stopPlaybackUIOnly();
+    setLoadState("loadStateNone");
+    setDropMsg("");
+    renderFileList();
+    renderSegmentList();
+    updateStats();
+    updateButtons();
+    updateOrderState();
+  }
+
   async function loadFilesFromEntries(entries, { orderMode = "default" } = {}) {
     tracks = [];
     segments = [];
@@ -1408,8 +1430,7 @@
 
   $("clearBtn").addEventListener("click", async () => {
     $("fileInput").value = "";
-    setDropMsg("");
-    await loadFilesFromEntries([]);
+    clearInputState();
   });
 
 

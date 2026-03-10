@@ -32,9 +32,19 @@
     .subtle { color: var(--muted); font-size: 12px; }
     .lang-switch { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
     .lang-switch label { font-size: 12px; color: var(--muted); }
-    fieldset { border: 1px solid var(--line); padding: 12px; margin: 10px 0; background: var(--panel); }
+    fieldset { border: 1px solid var(--line); padding: 18px 12px 12px; margin: 10px 0; background: var(--panel); }
     .panel-stack { display: grid; grid-template-rows: auto auto auto 1fr auto; }
-    legend { padding: 0 6px; color: var(--muted); }
+    legend {
+      padding: 0 10px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #fbfaf7 0%, #f3efe8 100%);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
     .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .col { display: flex; flex-direction: column; gap: 6px; }
     label { font-size: 13px; color: var(--ink); }
@@ -306,7 +316,7 @@
       appTitle: "Stratified Media Sampler",
       appSubtitle: "長尺作品の「おおまかな印象」を確実に掴むためのサンプラー",
       langLabel: "Language",
-      legendInput: "1) 入力",
+      legendInput: "STEP 1 Input",
       dropZoneTitle: "ここにファイルをドラッグ＆ドロップ",
       dropZoneHint: "フォルダのドロップがうまくいかない場合は、ファイルをドロップしてください。",
       fileInputLabel: "複数ファイル選択",
@@ -320,7 +330,7 @@
       orderCustom: "並び: カスタム",
       sortResetBtn: "整列",
       clearBtn: "クリア",
-      legendSampling: "2) サンプリング設定",
+      legendSampling: "STEP 2 Sampling",
       presetLabel: "プリセット",
       presetCustom: "カスタム",
       presetEasy: "簡易（20層 × 20秒）",
@@ -340,7 +350,7 @@
       totalListenLabel: "総聴取時間",
       coverageLabel: "時間比",
       buildBtn: "区間リスト生成",
-      legendPlayback: "3) 再生",
+      legendPlayback: "STEP 3 Playback",
       segmentListHeading: "区間リスト",
       segmentNote: "区間リストをShift+クリックでその区間から再生",
       playerHeading: "再生",
@@ -350,7 +360,7 @@
       nextBtn: "次へ",
       stopBtn: "停止",
       nowLabel: "現在:",
-      legendLog: "4) ログ",
+      legendLog: "Log",
       logHint: "「どのファイルのどの区間を再生したか」を追記します。",
       exportLogBtn: "ログ(JSON)をコピー",
       logColGlobal: "全体タイムライン（秒）",
@@ -390,7 +400,7 @@
       appTitle: "Stratified Media Sampler",
       appSubtitle: "A sampler for capturing the rough impression of long-form works with reliable coverage",
       langLabel: "Language",
-      legendInput: "1) Input",
+      legendInput: "STEP 1 Input",
       dropZoneTitle: "Drag and drop files here",
       dropZoneHint: "If dropping a folder does not work, drop files instead.",
       fileInputLabel: "Choose multiple files",
@@ -404,7 +414,7 @@
       orderCustom: "Order: custom",
       sortResetBtn: "Reset order",
       clearBtn: "Clear",
-      legendSampling: "2) Sampling Settings",
+      legendSampling: "STEP 2 Sampling",
       presetLabel: "Preset",
       presetCustom: "Custom",
       presetEasy: "Easy (20 layers x 20 sec)",
@@ -424,7 +434,7 @@
       totalListenLabel: "Total listening time",
       coverageLabel: "Coverage",
       buildBtn: "Build segment list",
-      legendPlayback: "3) Playback",
+      legendPlayback: "STEP 3 Playback",
       segmentListHeading: "Segment List",
       segmentNote: "Shift-click a segment to start playback there",
       playerHeading: "Player",
@@ -434,7 +444,7 @@
       nextBtn: "Next",
       stopBtn: "Stop",
       nowLabel: "Now:",
-      legendLog: "4) Log",
+      legendLog: "Log",
       logHint: "Append which file ranges were actually played.",
       exportLogBtn: "Copy log (JSON)",
       logColGlobal: "Global timeline (sec)",

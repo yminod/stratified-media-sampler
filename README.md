@@ -4,6 +4,8 @@ Long-form audio and video sampler for quickly capturing the overall impression o
 
 All processing happens locally in the browser. Files are not uploaded.
 
+Live app: https://yminod.github.io/stratified-media-sampler/
+
 ## Features
 
 - Load multiple media files or drop a folder containing media files
@@ -43,4 +45,3 @@ Reproducibility depends on all of the following:
 The main application file is `stratified-media-sampler.html`.
 
 For GitHub Pages, `index.html` redirects to that file.
-
